@@ -1,0 +1,224 @@
+<%- include('../partials/head', { pageStyles: ['/css/roi-editor.css'] }) %>
+<%- include('../partials/adminNav') %>
+
+<main class="page">
+  <div class="container">
+    <div class="page__header">
+      <div>
+        <h1 class="page__title">เครื่องมือวาด ROI</h1>
+        <p class="page__subtitle">
+          <%= station.name %> · ภาพต้นทาง <%= station.imageWidth %>×<%= station.imageHeight %> พิกเซล
+        </p>
+      </div>
+      <div class="page__actions">
+        <button class="btn" type="button" id="undoBtn" disabled>↶ ย้อนกลับ</button>
+        <button class="btn" type="button" id="redoBtn" disabled>↷ ทำซ้ำ</button>
+        <button class="btn btn--primary" type="button" id="saveBtn">💾 บันทึกเข้าระบบ</button>
+      </div>
+    </div>
+
+    <div class="alert alert--info">
+      <strong>วิธีใช้:</strong>
+      ลากตรงกลางกรอบเพื่อย้ายทั้งรูป · ลากที่จุดขาวตามมุมเพื่อปรับทีละมุม ·
+      ลูกศรขยับทีละพิกเซล (กด Shift = 10 พิกเซล) · Ctrl+Z ย้อนกลับ · Delete ลบกรอบที่เลือก
+    </div>
+
+    <!-- ═══ แหล่งภาพ ═══ -->
+    <section class="card mb-2">
+      <div class="card__header"><h2 class="card__title">แหล่งภาพ</h2></div>
+      <div class="card__body">
+        <div class="grid grid--2">
+          <div>
+            <h3 style="font-size:.9rem">อัปโหลดภาพนิ่ง</h3>
+            <input class="input" type="file" id="imageInput" accept="image/*">
+            <p class="field__hint">ใช้ภาพที่จับจากกล้องมาแล้วเพื่อวาดอย่างแม่นยำ</p>
+          </div>
+          <div>
+            <h3 style="font-size:.9rem">เชื่อมต่อกล้องสด</h3>
+            <div class="flex flex--wrap">
+              <select class="select input--sm" id="cameraType" style="width:auto">
+                <% ['m3u8', 'snapshot', 'mjpeg'].forEach((type) => { %>
+                  <option value="<%= type %>" <%= station.cameraType === type ? 'selected' : '' %>>
+                    <%= type %>
+                  </option>
+                <% }) %>
+              </select>
+              <input class="input input--sm mono" type="url" id="cameraUrl" style="flex:1;min-width:200px"
+                     value="<%= station.cameraUrl || '' %>" placeholder="https://…/index.m3u8">
+            </div>
+            <div class="flex mt-1">
+              <button class="btn btn--sm" type="button" id="pullSnapshot">⬇ ดึงภาพจากกล้อง</button>
+                <button class="btn btn--sm btn--primary" type="button" id="connectCamera">เชื่อมต่อ</button>
+              <button class="btn btn--sm" type="button" id="captureFrame">📷 จับเฟรม</button>
+              <button class="btn btn--sm" type="button" id="disconnectCamera">ตัดการเชื่อมต่อ</button>
+              <span class="badge" id="cameraStatus">ยังไม่เชื่อมต่อ</span>
+            </div>
+          </div>
+        </div>
+        <!-- อิลิเมนต์สื่อที่ซ่อนไว้ — RoiEditor ดึงเฟรมจากตรงนี้ไปวาดลง canvas -->
+        <div id="cameraContainer" hidden>
+          <video id="cameraVideo" muted playsinline autoplay crossorigin="anonymous"></video>
+          <img id="cameraImage" alt="" crossorigin="anonymous">
+        </div>
+      </div>
+    </section>
+
+    <div class="roi-layout">
+      <!-- ═══ พื้นที่วาด ═══ -->
+      <section class="card">
+        <div class="card__header">
+          <h2 class="card__title">พื้นที่วาด</h2>
+          <span class="mono small muted" id="cursorInfo">X: —  Y: —</span>
+        </div>
+        <div class="card__body">
+          <div class="roi-canvas-wrap">
+            <canvas id="roiCanvas"></canvas>
+          </div>
+          <p class="mono small muted mt-1" id="roiInfo">ยังไม่ได้เลือก ROI</p>
+          <div id="roiWarnings" class="mt-1"></div>
+
+          <div class="card__footer mt-2" style="border-radius:var(--radius)">
+            <h3 style="font-size:.85rem">ทดสอบระดับน้ำ</h3>
+            <div class="flex flex--wrap flex--center">
+              <input class="input input--sm" type="number" id="testLevel" style="width:8rem"
+                     placeholder="พิกเซล Y" min="0" max="<%= station.imageHeight %>">
+              <button class="btn btn--sm" type="button" id="clearTest">ล้าง</button>
+              <span class="small" id="testResult"></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ แผงควบคุม ═══ -->
+      <aside class="roi-sidebar">
+        <section class="card mb-2">
+          <div class="card__header"><h2 class="card__title">เพิ่ม ROI</h2></div>
+          <div class="card__body">
+            <button class="btn btn--block mb-1" type="button" id="addMeasurement"
+                    style="border-color:#EAB308;color:#a16207">
+              + ROI วัดระดับ (มีโซน)
+            </button>
+            <button class="btn btn--block" type="button" id="addDetection"
+                    style="border-color:#A855F7;color:#7e22ce">
+              + ROI ตรวจจับ (ไม่มีโซน)
+            </button>
+          </div>
+        </section>
+
+        <section class="card mb-2">
+          <div class="card__header">
+            <h2 class="card__title">รายการ ROI</h2>
+            <button class="btn btn--sm btn--danger" type="button" id="removeRoi">ลบที่เลือก</button>
+          </div>
+          <div class="card__body">
+            <div id="roiList"></div>
+            <div class="field mt-2">
+              <label class="field__label" for="roiName">ชื่อ ROI ที่เลือก</label>
+              <input class="input input--sm" type="text" id="roiName" maxlength="255">
+            </div>
+          </div>
+        </section>
+
+        <section class="card mb-2">
+          <div class="card__header"><h2 class="card__title">โซนเตือนภัย</h2></div>
+          <div class="card__body">
+            <div id="zonePanel"></div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card__header"><h2 class="card__title">นำเข้า / ส่งออก</h2></div>
+          <div class="card__body">
+            <button class="btn btn--block mb-1" type="button" id="exportConfig">
+              ⬇ ส่งออกไฟล์ JSON
+            </button>
+            <label class="btn btn--block" for="importInput">⬆ นำเข้าไฟล์ JSON</label>
+            <input type="file" id="importInput" accept=".json,application/json" hidden>
+            <p class="field__hint">รองรับไฟล์ config เดิมทั้งเวอร์ชัน 2.0 และ 3.0</p>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </div>
+</main>
+
+<script type="application/json" id="editorData">
+<%- JSON.stringify({
+  station: {
+    id: station.id, slug: station.slug, name: station.name,
+    imageWidth: station.imageWidth, imageHeight: station.imageHeight,
+    cameraUrl: station.cameraUrl, cameraType: station.cameraType, pdpa: station.pdpa,
+    cameraNeedsAuth: Boolean(station.cameraUsername),
+  },
+  rois,
+  zoneCatalog: defaultZones,
+  calibration: calibration.map((point) => ({ pixel: point.pixel, meter: point.meter })),
+}) %>
+</script>
+
+<script>
+/* ประกอบเครื่องมือวาดหลังโหลดคลาสทั้งหมดแล้ว */
+window.addEventListener('load', () => {
+  const data = JSON.parse(document.getElementById('editorData').textContent);
+  const byId = (id) => document.getElementById(id);
+
+  const editor = new window.RoiEditor({
+    canvas: byId('roiCanvas'),
+    station: data.station,
+    rois: data.rois,
+    zoneCatalog: data.zoneCatalog,
+    calibration: data.calibration,
+    elements: {
+      roiList: byId('roiList'), zonePanel: byId('zonePanel'),
+      roiInfo: byId('roiInfo'), cursorInfo: byId('cursorInfo'),
+      warnings: byId('roiWarnings'), roiName: byId('roiName'),
+      addMeasurement: byId('addMeasurement'), addDetection: byId('addDetection'),
+      removeRoi: byId('removeRoi'), undo: byId('undoBtn'), redo: byId('redoBtn'),
+      save: byId('saveBtn'), exportConfig: byId('exportConfig'), importInput: byId('importInput'),
+      imageInput: byId('imageInput'), connectCamera: byId('connectCamera'),
+      disconnectCamera: byId('disconnectCamera'), captureFrame: byId('captureFrame'),
+      cameraUrl: byId('cameraUrl'), cameraType: byId('cameraType'),
+      cameraStatus: byId('cameraStatus'), cameraContainer: byId('cameraContainer'),
+      cameraVideo: byId('cameraVideo'), cameraImage: byId('cameraImage'),
+      testLevel: byId('testLevel'), clearTest: byId('clearTest'), testResult: byId('testResult'),
+    },
+  }).init();
+
+  byId('roiName')?.addEventListener('change', (event) => editor.renameSelected(event.target.value));
+
+  /* ดึงภาพนิ่งผ่านเซิร์ฟเวอร์ — ใช้ได้กับกล้องทุกแบบรวมถึงกล้องที่ต้องยืนยันตัวตน
+     เบราว์เซอร์ต่อกล้องเองไม่ได้เพราะติด Digest auth, mixed content และ CORS
+     ภาพที่ได้มาจาก origin เดียวกับหน้าเว็บ จึงจับเฟรมลง canvas ได้ไม่ปนเปื้อน */
+  byId('pullSnapshot')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    const status = byId('cameraStatus');
+    button.disabled = true;
+    if (status) status.textContent = 'กำลังดึงภาพ…';
+    try {
+      const response = await fetch(
+        `/api/admin/stations/<%= station.id %>/camera/snapshot?t=${Date.now()}`,
+        { credentials: 'same-origin' },
+      );
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body?.error?.message ?? `เซิร์ฟเวอร์ตอบรหัส ${response.status}`);
+      }
+      const blob = await response.blob();
+      const reader = new FileReader();
+      reader.onload = () => {
+        editor.setBackgroundImage(reader.result, { stopCamera: true });
+        if (status) status.textContent = 'ได้ภาพจากกล้องแล้ว';
+      };
+      reader.readAsDataURL(blob);
+    } catch (error) {
+      if (status) status.textContent = 'ดึงภาพไม่สำเร็จ';
+      window.AppShell?.toast(`ดึงภาพจากกล้องไม่สำเร็จ: ${error.message}`, 'danger');
+    } finally {
+      button.disabled = false;
+    }
+  });
+});
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js"></script>
+<%- include('../partials/foot', { pageScripts: ['/js/CameraSource.js', '/js/RoiEditor.js'] }) %>

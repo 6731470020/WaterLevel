@@ -1,0 +1,232 @@
+<%- include('../partials/head') %>
+<%- include('../partials/adminNav') %>
+
+<main class="page">
+  <div class="container">
+    <div class="page__header">
+      <div>
+        <h1 class="page__title"><%= station.name %></h1>
+        <p class="page__subtitle">
+          <a class="mono" href="<%= station.publicPath %>" target="_blank" rel="noopener">
+            <%= baseUrl %><%= station.publicPath %> ↗
+          </a>
+        </p>
+      </div>
+      <div class="page__actions">
+        <% if (can('capture.trigger')) { %>
+          <button class="btn" type="button" id="captureNow"
+                  data-station-id="<%= station.id %>">📷 จับภาพและวัดทันที</button>
+        <% } %>
+        <% if (can('roi.write')) { %>
+          <a class="btn" href="/admin/stations/<%= station.id %>/roi">วาด ROI</a>
+        <% } %>
+        <% if (can('calibration.write')) { %>
+          <a class="btn" href="/admin/stations/<%= station.id %>/calibration">จุดเทียบค่า</a>
+        <% } %>
+      </div>
+    </div>
+
+    <% if (query.created === '1') { %><div class="alert alert--success">สร้างจุดวัดเรียบร้อยแล้ว</div><% } %>
+    <% if (query.updated === '1') { %><div class="alert alert--success">บันทึกการเปลี่ยนแปลงแล้ว</div><% } %>
+
+    <!-- ═══ ความพร้อมของจุดวัด ═══ -->
+    <% if (!readiness.ready) { %>
+      <div class="alert alert--warning">
+        <strong>จุดวัดนี้ยังตั้งค่าไม่ครบ — ระบบอาจตรวจวัดไม่ได้หรือได้ค่าไม่สมบูรณ์</strong>
+        <ul>
+          <% readiness.issues.forEach((issue) => { %><li><%= issue %></li><% }) %>
+        </ul>
+      </div>
+    <% } else { %>
+      <div class="alert alert--success">✓ จุดวัดนี้ตั้งค่าครบถ้วน พร้อมตรวจวัดอัตโนมัติ</div>
+    <% } %>
+
+    <nav class="tabs">
+      <% [
+        ['general', 'ทั่วไป'], ['roi', 'ROI และโซน'], ['calibration', 'จุดเทียบค่า'],
+        ['alert', 'การแจ้งเตือน'], ['pdpa', 'PDPA'],
+      ].forEach(([key, label]) => { %>
+        <a class="tabs__item <%= tab === key ? 'is-active' : '' %>"
+           href="/admin/stations/<%= station.id %>?tab=<%= key %>"><%= label %></a>
+      <% }) %>
+    </nav>
+
+    <% if (tab === 'general') { %>
+      <div class="card">
+        <div class="card__header">
+          <h2 class="card__title">ข้อมูลทั่วไป</h2>
+          <% if (can('station.update')) { %>
+            <a class="btn btn--sm btn--primary" href="/admin/stations/<%= station.id %>/edit">แก้ไข</a>
+          <% } %>
+        </div>
+        <div class="card__body">
+          <dl class="grid grid--2">
+            <div><dt class="small muted">ชื่อย่อ (URL)</dt><dd class="mono"><%= station.slug %></dd></div>
+            <div><dt class="small muted">สถานะ</dt><dd>
+              <%= station.isActive ? 'เปิดใช้งาน' : 'ปิดใช้งาน' %></dd></div>
+            <div><dt class="small muted">ชนิดกล้อง</dt><dd><%= station.cameraType %></dd></div>
+            <div><dt class="small muted">ขนาดภาพต้นทาง</dt>
+              <dd><%= station.imageWidth %> × <%= station.imageHeight %> พิกเซล</dd></div>
+            <div><dt class="small muted">URL กล้อง</dt>
+              <dd class="mono small" style="word-break:break-all"><%= station.cameraUrl || '—' %></dd></div>
+            <div><dt class="small muted">พิกัด</dt><dd>
+              <% if (station.latitude !== null) { %>
+                <%= formatNumber(station.latitude, 6) %>, <%= formatNumber(station.longitude, 6) %>
+              <% } else { %>—<% } %>
+            </dd></div>
+          </dl>
+        </div>
+      </div>
+
+    <% } else if (tab === 'roi') { %>
+      <div class="card">
+        <div class="card__header">
+          <h2 class="card__title">ขอบเขต ROI (<%= rois.length %> กรอบ)</h2>
+          <% if (can('roi.write')) { %>
+            <a class="btn btn--sm btn--primary" href="/admin/stations/<%= station.id %>/roi">
+              เปิดเครื่องมือวาด
+            </a>
+          <% } %>
+        </div>
+        <div class="card__body">
+          <% if (!rois.length) { %>
+            <p class="muted">ยังไม่ได้วาด ROI สำหรับจุดวัดนี้</p>
+          <% } %>
+          <% rois.forEach((roi) => { %>
+            <section class="mb-3">
+              <h3>
+                <span class="badge" style="background:<%= roi.strokeColor %>22;color:<%= roi.strokeColor %>;border-color:<%= roi.strokeColor %>">
+                  <%= roi.type === 'measurement' ? 'วัดระดับ' : 'ตรวจจับ' %>
+                </span>
+                <%= roi.name %>
+              </h3>
+              <p class="small muted mono">
+                มุม: <%= roi.points.map((p) => `(${p.x},${p.y})`).join(' · ') %>
+              </p>
+              <% if (roi.zones.length) { %>
+                <div class="zone-scale">
+                  <% roi.zones.slice().sort((a,b) => a.severity - b.severity).forEach((zone) => { %>
+                    <div class="zone-scale__row" style="--zone-color: <%= zone.color %>">
+                      <span class="zone-scale__swatch"></span>
+                      <span><%= zone.label %></span>
+                      <span class="zone-scale__value">
+                        Y = <%= zone.yPosition %> px
+                        <%= zone.alertEnabled ? '· แจ้งเตือน' : '' %>
+                      </span>
+                    </div>
+                  <% }) %>
+                </div>
+              <% } %>
+            </section>
+          <% }) %>
+        </div>
+      </div>
+
+    <% } else if (tab === 'calibration') { %>
+      <div class="card">
+        <div class="card__header">
+          <h2 class="card__title">จุดเทียบค่าพิกเซล ↔ เมตร (<%= calibration.length %> จุด)</h2>
+          <% if (can('calibration.write')) { %>
+            <a class="btn btn--sm btn--primary" href="/admin/stations/<%= station.id %>/calibration">
+              จัดการจุดเทียบค่า
+            </a>
+          <% } %>
+        </div>
+        <div class="card__body">
+          <% if (calibration.length < 2) { %>
+            <div class="alert alert--warning">
+              ต้องมีจุดเทียบค่าอย่างน้อย 2 จุด ระบบจึงจะแปลงค่าเป็นเมตรได้
+              <br><span class="small">ระบบจะไม่ใช้ค่าสำรองใด ๆ — ค่าวัดจะถูกบันทึกเป็นพิกเซลเท่านั้น</span>
+            </div>
+          <% } %>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th class="table__num">พิกเซล Y</th><th class="table__num">ระดับน้ำ (ม.)</th></tr></thead>
+              <tbody>
+                <% calibration.forEach((point) => { %>
+                  <tr>
+                    <td class="table__num mono"><%= point.pixel %></td>
+                    <td class="table__num mono"><%= formatNumber(point.meter) %></td>
+                  </tr>
+                <% }) %>
+                <% if (!calibration.length) { %>
+                  <tr><td colspan="2" class="table__empty">ยังไม่มีจุดเทียบค่า</td></tr>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+          <p class="small faint mt-1">พิกเซลน้อย = น้ำสูง · พิกเซลมาก = น้ำต่ำ</p>
+        </div>
+      </div>
+
+    <% } else if (tab === 'alert') { %>
+      <div class="card">
+        <div class="card__header"><h2 class="card__title">การตั้งค่าแจ้งเตือน</h2></div>
+        <div class="card__body">
+          <dl>
+            <dt class="small muted">โซนที่แจ้งเตือน</dt>
+            <dd class="flex flex--wrap mb-2">
+              <% if (!station.alertZoneKeys.length) { %><span class="muted">ไม่แจ้งเตือนโซนใดเลย</span><% } %>
+              <% station.alertZoneKeys.forEach((key) => {
+                   const zone = zoneLevels.find((z) => z.key === key); %>
+                <%- include('../partials/zoneBadge', { zone }) %>
+              <% }) %>
+            </dd>
+            <dt class="small muted">ระยะกันแจ้งเตือนซ้ำ</dt>
+            <dd class="mb-2"><%= station.alertCooldownMinutes %> นาที
+              <span class="small faint">(ยกเว้นเมื่อโซนแย่ลง จะแจ้งทันที)</span></dd>
+            <dt class="small muted">กลุ่ม LINE ปลายทาง</dt>
+            <dd class="mono small"><%= station.lineGroupId || 'ใช้ค่าเริ่มต้นของระบบ' %></dd>
+          </dl>
+        </div>
+      </div>
+
+    <% } else { %>
+      <div class="card">
+        <div class="card__header"><h2 class="card__title">ความเป็นส่วนตัว (PDPA)</h2></div>
+        <div class="card__body">
+          <dl class="grid grid--2">
+            <div><dt class="small muted">การปกปิดใบหน้า</dt>
+              <dd><%= station.pdpa.enabled ? '✓ เปิดใช้งาน' : '✗ ปิดอยู่ (ไม่แนะนำ)' %></dd></div>
+            <div><dt class="small muted">วิธีปกปิด</dt>
+              <dd><%= station.pdpa.method === 'blur' ? 'เบลอ' : 'โมเสก' %>
+                (ความแรง <%= station.pdpa.blur_strength %>)</dd></div>
+            <div><dt class="small muted">ค่าความเชื่อมั่นขั้นต่ำ</dt>
+              <dd><%= station.pdpa.conf_threshold %></dd></div>
+            <div><dt class="small muted">เก็บภาพไว้</dt>
+              <dd><%= station.imageRetentionDays %> วัน แล้วลบอัตโนมัติ</dd></div>
+          </dl>
+        </div>
+      </div>
+    <% } %>
+  </div>
+</main>
+
+<script>
+/* ปุ่มจับภาพและวัดทันที — เรียก API เดียวกับที่งานตามเวลาใช้ */
+document.getElementById('captureNow')?.addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  const stationId = button.dataset.stationId;
+  button.disabled = true;
+  button.textContent = 'กำลังวัด…';
+  try {
+    const result = await window.AppShell.api(`/api/admin/stations/${stationId}/capture`,
+      { method: 'POST' });
+    window.AppShell.toast(
+      result.recorded
+        ? `บันทึกค่าวัดแล้ว: ${result.measurement?.waterLevelM != null
+            ? result.measurement.waterLevelM.toFixed(2) + ' เมตร'
+            : 'แต่ยังแปลงเป็นเมตรไม่ได้ — ตรวจสอบจุดเทียบค่า'}`
+        : `ไม่บันทึกค่า: ${result.reason}`,
+      result.recorded ? 'success' : 'warning');
+    if (result.recorded) setTimeout(() => window.location.reload(), 1500);
+  } catch (error) {
+    window.AppShell.toast(error.message, 'danger');
+  } finally {
+    button.disabled = false;
+    button.textContent = '📷 จับภาพและวัดทันที';
+  }
+});
+</script>
+
+<%- include('../partials/foot') %>

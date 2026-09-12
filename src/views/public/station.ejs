@@ -1,0 +1,402 @@
+<%- include('../partials/head') %>
+<%- include('../partials/publicNav') %>
+
+<%
+  // ค่าที่วัดล่าสุดไม่กี่ค่า สำหรับแถบเลื่อนแนวนอนในคอลัมน์ขวา
+  const recent = (chart.last24h || []).slice(-8).reverse();
+  const zoneOf = (key) => zoneLevels.find((item) => item.key === key) || null;
+%>
+
+<main class="page" data-station-slug="<%= station.slug %>">
+  <div class="container">
+
+    <!-- ═══ แถบหัวเรื่อง ═══ -->
+    <header class="station-hero">
+      <div class="station-hero__inner">
+        <span class="station-hero__mark" aria-hidden="true">💧</span>
+        <div class="station-hero__text">
+          <h1 class="station-hero__title"><%= station.name %></h1>
+          <p class="station-hero__subtitle">
+            <% if (station.description) { %>
+              <%= station.description %>
+            <% } else { %>
+              ระบบตรวจวัดระดับน้ำอัตโนมัติจากภาพกล้องวงจรปิด
+            <% } %>
+          </p>
+        </div>
+        <div class="station-hero__aside">
+          <% if (latest) { %>
+            <span class="station-hero__chip">
+              🕒 <%= latest.measuredAtText %>
+            </span>
+          <% } %>
+          <span class="station-hero__chip" id="lastRefresh">อัปเดตอัตโนมัติทุก 60 วินาที</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="station-layout">
+
+      <!-- ════════ คอลัมน์หลัก: กล้อง · กราฟ · แกลเลอรี ════════ -->
+      <div class="station-layout__main">
+
+        <!-- ═══ กล้องสดพร้อม ROI ทับภาพ ═══ -->
+        <section class="card">
+          <div class="card__header">
+            <h2 class="card__title">ภาพจากกล้อง</h2>
+            <span class="badge" id="cameraStatus">กำลังเชื่อมต่อ…</span>
+          </div>
+          <div class="card__body">
+            <div class="camera camera--capped" id="cameraContainer"
+                 data-camera-url="<%= station.cameraUrl || '' %>"
+                 data-camera-type="<%= station.cameraType %>"
+                 data-image-width="<%= station.imageWidth %>"
+                 data-image-height="<%= station.imageHeight %>"
+                 data-water-line="<%= latest ? latest.waterLine : '' %>"
+                 data-rois='<%- JSON.stringify(rois) %>'
+                 data-zones='<%- JSON.stringify(zones) %>'>
+              <% if (station.publicLiveEnabled) { %>
+                <%# ภาพสดผ่านตัวกลางของเรา — รีเฟรชเป็นจังหวะแทนการถ่ายทอดต่อเนื่อง
+                    เพราะสตรีมต่อเนื่องหนึ่งสายต่อผู้ชมหนึ่งคนจะทำให้กล้องรับไม่ไหว %>
+                <img class="camera__media" id="cameraLive" alt="ภาพสดจาก <%= station.name %>"
+                     src="/api/public/stations/<%= station.slug %>/camera.jpg"
+                     data-live-src="/api/public/stations/<%= station.slug %>/camera.jpg">
+                <canvas class="camera__overlay" id="cameraOverlay"></canvas>
+              <% } else if (station.cameraUrl) { %>
+                <video class="camera__media" id="cameraVideo" muted playsinline autoplay
+                       <% if (latest && latest.imageUrl) { %>poster="<%= latest.imageUrl %>"<% } %>></video>
+                <img class="camera__media" id="cameraImage" alt="ภาพจากกล้อง <%= station.name %>" hidden>
+                <canvas class="camera__overlay" id="cameraOverlay"></canvas>
+              <% } else if (latest && latest.imageUrl) { %>
+                <img class="camera__media" src="<%= latest.imageUrl %>"
+                     alt="ภาพล่าสุดจาก <%= station.name %>">
+                <canvas class="camera__overlay" id="cameraOverlay"></canvas>
+              <% } else { %>
+                <%# แยกสาเหตุให้ชัด — "ยังไม่ได้ตั้งค่ากล้อง" กับ "ตั้งแล้วแต่ยังไม่มีภาพ"
+                    เป็นคนละเรื่องกัน และผู้ดูแลต้องไปแก้คนละที่ %>
+                <div class="camera__placeholder">
+                  <% if (station.hasCamera) { %>
+                    ยังไม่มีภาพจากจุดวัดนี้ — ระบบจะแสดงให้อัตโนมัติหลังตรวจวัดสำเร็จครั้งแรก
+                  <% } else { %>
+                    ยังไม่ได้ตั้งค่ากล้องสำหรับจุดวัดนี้
+                  <% } %>
+                </div>
+              <% } %>
+            </div>
+
+            <p class="small muted mt-1">
+              <% if (station.publicLiveEnabled) { %>
+                <%# ต้องพูดตรง ๆ — ภาพสดไม่ผ่านการเบลอ การเขียนว่า "ทุกภาพ" จะเป็นความเท็จ %>
+                📹 ภาพสดจากกล้องโดยตรง · ภาพที่บันทึกไว้ผ่านการปกปิดใบหน้าอัตโนมัติแล้ว
+              <% } else { %>
+                🔒 ภาพผ่านการปกปิดใบหน้าอัตโนมัติก่อนบันทึกและเผยแพร่ทุกภาพ
+              <% } %>
+              <% if (latest && latest.pdpaStats) { %>
+                · ปกปิดใบหน้า <%= latest.pdpaStats.facesCount ?? 0 %> จุดในภาพล่าสุด
+              <% } %>
+            </p>
+          </div>
+        </section>
+
+        <!-- ═══ กราฟระดับน้ำ ═══ -->
+        <section class="card">
+          <div class="card__header">
+            <h2 class="card__title">กราฟระดับน้ำ</h2>
+            <div class="flex">
+              <button class="btn btn--sm btn--primary" type="button" data-chart-range="24">24 ชั่วโมง</button>
+              <button class="btn btn--sm" type="button" data-chart-range="168">7 วัน</button>
+            </div>
+          </div>
+          <div class="card__body">
+            <div class="chart-wrap">
+              <canvas id="waterChart"
+                      data-series-day='<%- JSON.stringify(chart.last24h) %>'
+                      data-series-week='<%- JSON.stringify(chart.last7d) %>'
+                      data-zones='<%- JSON.stringify(zones) %>'></canvas>
+            </div>
+            <p class="small faint mt-1">
+              ค่าที่แสดงเป็นเมตรจากระดับอ้างอิงของจุดวัด · ช่วง 7 วันแสดงค่าเฉลี่ยรายชั่วโมง
+            </p>
+          </div>
+        </section>
+
+        <!-- ═══ แกลเลอรีภาพ ═══ -->
+        <section class="card">
+          <div class="card__header"><h2 class="card__title">ภาพล่าสุด</h2></div>
+          <div class="card__body">
+            <% if (gallery.length) { %>
+              <div class="gallery" id="gallery">
+                <% gallery.forEach((item) => { %>
+                  <button type="button" class="gallery__item"
+                          data-full="<%= item.imageUrl %>"
+                          data-caption="<%= item.measuredAtText %><%= item.waterLevelM !== null ? ' · ' + formatNumber(item.waterLevelM) + ' ม.' : '' %>">
+                    <img src="<%= item.thumbnailUrl || item.imageUrl %>" loading="lazy"
+                         alt="ภาพเมื่อ <%= item.measuredAtText %>">
+                    <span class="gallery__caption">
+                      <%= item.measuredAtText.replace(' เวลา ', ' ') %>
+                      <% if (item.zone) { %>
+                        <br><span style="color:<%= item.zone.color %>">● <%= item.zone.label %></span>
+                      <% } %>
+                    </span>
+                  </button>
+                <% }) %>
+              </div>
+            <% } else { %>
+              <p class="muted">ยังไม่มีภาพที่บันทึกไว้</p>
+            <% } %>
+          </div>
+        </section>
+      </div>
+
+      <!-- ════════ คอลัมน์ข้อมูล: ระดับน้ำ · โซน · ค่าล่าสุด · สรุป ════════ -->
+      <div class="station-layout__side">
+
+        <!-- ═══ การ์ดระดับน้ำปัจจุบัน ═══ -->
+        <section class="level-card" style="--zone-color: <%= zone ? zone.color : 'var(--zone-normal)' %>">
+          <h2 style="font-size:.9rem;color:var(--text-muted);font-weight:500">ระดับน้ำปัจจุบัน</h2>
+
+          <% if (latest) { %>
+            <div class="level-card__value">
+              <% if (latest.waterLevelM !== null) { %>
+                <%= formatNumber(latest.waterLevelM) %><span class="level-card__unit"> ม.</span>
+              <% } else { %>
+                <%# ไม่แสดงพิกเซลให้คนทั่วไปเห็น — เป็นหน่วยภายในที่ตีความไม่ได้
+                    บอกไปตรง ๆ ว่ายังแปลงเป็นเมตรไม่ได้ ดีกว่าโชว์ตัวเลขที่ไร้ความหมาย %>
+                <span class="level-card__unavailable">ยังไม่มีค่าเป็นเมตร</span>
+              <% } %>
+            </div>
+
+            <div class="mt-1"><%- include('../partials/zoneBadge', { zone }) %></div>
+
+            <% if (latest.isEstimate) { %>
+              <p class="alert alert--warning small mt-1" style="margin-bottom:0">
+                ⚠ <strong>ค่าประมาณขั้นต่ำ</strong> — กล้องมองไม่เห็นจุดที่เสาวัดระดับ
+                บรรจบผิวน้ำ (เสาทะลุขอบล่างของภาพ) ระดับน้ำจริงอาจ<strong>ต่ำกว่า</strong>
+                ตัวเลขนี้ ใช้ดูแนวโน้มได้แต่ยังไม่ใช่ค่าที่ยืนยันได้
+              </p>
+            <% } %>
+
+            <% if (latest.waterLevelM === null) { %>
+              <p class="alert alert--warning small mt-1" style="margin-bottom:0">
+                จุดวัดนี้ยังไม่มีจุดเทียบค่าตอนที่บันทึกค่านี้ ระบบจึงแปลงเป็นเมตรไม่ได้
+                — ค่าใหม่ที่วัดหลังตั้งจุดเทียบค่าแล้วจะแสดงเป็นเมตรตามปกติ
+              </p>
+            <% } %>
+
+            <p class="level-card__meta">
+              วัดเมื่อ <%= latest.measuredAtText %>
+              <% if ((latest.ageMinutes ?? 999) > 30) { %>
+                <br><span class="level-card__stale">⚠ ข้อมูลไม่อัปเดตมาแล้ว <%= latest.ageMinutes %> นาที</span>
+              <% } %>
+            </p>
+
+            <% if (summary.count > 0) { %>
+              <dl class="grid grid--2 mt-2" style="gap:.5rem">
+                <div>
+                  <dt class="small muted">สูงสุดวันนี้</dt>
+                  <dd style="margin:0"><%= formatNumber(summary.highestMeter) %> ม.
+                    <span class="faint small"><%= summary.highestAt ? summary.highestAt.slice(0,5) : '' %></span></dd>
+                </div>
+                <div>
+                  <dt class="small muted">ต่ำสุดวันนี้</dt>
+                  <dd style="margin:0"><%= formatNumber(summary.lowestMeter) %> ม.
+                    <span class="faint small"><%= summary.lowestAt ? summary.lowestAt.slice(0,5) : '' %></span></dd>
+                </div>
+              </dl>
+            <% } %>
+          <% } else { %>
+            <p class="muted mt-2">ยังไม่มีข้อมูลการวัดสำหรับจุดวัดนี้</p>
+          <% } %>
+        </section>
+
+        <!-- ═══ แถบเตือนภัย 6 ระดับ ═══ -->
+        <section class="card">
+          <div class="card__header"><h2 class="card__title">ระดับการเตือนภัย</h2></div>
+          <div class="card__body">
+            <div class="zone-scale">
+              <% zones.slice().sort((a, b) => a.severity - b.severity).forEach((item) => { %>
+                <div class="zone-scale__row <%= zone && zone.key === item.key ? 'is-current' : '' %>"
+                     style="--zone-color: <%= item.color %>">
+                  <span class="zone-scale__swatch" aria-hidden="true"></span>
+                  <span><%= item.label %></span>
+                  <span class="zone-scale__value">
+                    <%# หน้าสาธารณะไม่แสดงพิกเซล — เป็นหน่วยภายในของระบบตรวจจับ %>
+                    <% if (item.meterLevel !== null && item.meterLevel !== undefined) { %>
+                      ตั้งแต่ <%= formatNumber(item.meterLevel) %> ม.
+                    <% } else { %>
+                      <span class="faint">ยังไม่ได้ระบุระดับ</span>
+                    <% } %>
+                  </span>
+                </div>
+              <% }) %>
+              <% if (!zones.length) { %>
+                <p class="muted small">จุดวัดนี้ยังไม่ได้กำหนดโซนเตือนภัย</p>
+              <% } %>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══ แนวโน้มล่วงหน้า ═══ -->
+        <section class="card">
+          <div class="card__header">
+            <h2 class="card__title">แนวโน้มล่วงหน้า 6 ชั่วโมง</h2>
+            <% if (forecast.available) { %>
+              <span class="badge badge--<%= { HIGH: 'success', MEDIUM: 'warning', LOW: 'danger' }[forecast.confidence] %>">
+                <%= { HIGH: 'ความเชื่อมั่นสูง', MEDIUM: 'ความเชื่อมั่นปานกลาง', LOW: 'ความเชื่อมั่นต่ำ' }[forecast.confidence] %>
+              </span>
+            <% } %>
+          </div>
+          <div class="card__body">
+            <% if (!forecast.available) { %>
+              <p class="muted small"><%= forecast.reason %></p>
+            <% } else { %>
+              <%
+                const trendText = {
+                  RISING: { icon: '▲', label: 'ระดับน้ำมีแนวโน้มสูงขึ้น', color: 'var(--zone-critical)' },
+                  FALLING: { icon: '▼', label: 'ระดับน้ำมีแนวโน้มลดลง', color: 'var(--zone-high)' },
+                  STABLE: { icon: '▬', label: 'ระดับน้ำทรงตัว', color: 'var(--text-muted)' },
+                  UNCLEAR: { icon: '?', label: 'ข้อมูลแกว่งจนบอกทิศทางไม่ได้', color: 'var(--text-muted)' },
+                }[forecast.trend];
+              %>
+              <p class="forecast__trend" style="color:<%= trendText.color %>">
+                <%= trendText.icon %> <%= trendText.label %>
+                <% if (forecast.trend === 'RISING' || forecast.trend === 'FALLING') { %>
+                  <span class="forecast__rate">
+                    <%= Math.abs(forecast.slopePerHour).toFixed(2) %> ม./ชม.
+                  </span>
+                <% } %>
+              </p>
+
+              <div class="reading-strip mt-1">
+                <% forecast.points.forEach((point) => { %>
+                  <div class="reading-strip__item"
+                       style="--zone-color: <%= point.zone ? point.zone.color : 'var(--border)' %>">
+                    <div class="reading-strip__time">
+                      <%= String(point.at.getHours()).padStart(2, '0') %>:<%= String(point.at.getMinutes()).padStart(2, '0') %> น.
+                    </div>
+                    <div class="reading-strip__value">
+                      <%= formatNumber(point.meter) %><span class="reading-strip__unit"> ม.</span>
+                    </div>
+                    <div class="reading-strip__time">±<%= formatNumber(forecast.marginMeters) %></div>
+                  </div>
+                <% }) %>
+              </div>
+
+              <p class="small faint mt-1">
+                คำนวณจากค่าวัด <%= forecast.basedOn %> ครั้งในช่วง <%= forecast.spanHours %> ชั่วโมงที่ผ่านมา
+                <% if (forecast.estimateShare > 0) { %>
+                  · <strong><%= Math.round(forecast.estimateShare * 100) %>%</strong> ของข้อมูลเป็นค่าประมาณ
+                <% } %>
+              </p>
+              <p class="small faint" style="margin-top:.35rem">
+                ⚠ เป็นการต่อแนวโน้มจากตัวเลขที่ผ่านมาเท่านั้น ยังไม่รวมฝนที่กำลังจะตก
+                การเปิดปิดประตูน้ำ หรือน้ำทะเลหนุน — ใช้ประกอบการเฝ้าระวัง ไม่ใช่แทนการเฝ้าระวัง
+              </p>
+            <% } %>
+          </div>
+        </section>
+
+        <!-- ═══ ค่าที่วัดล่าสุด ═══ -->
+        <% if (recent.length) { %>
+          <section class="card">
+            <div class="card__header"><h2 class="card__title">ค่าที่วัดล่าสุด</h2></div>
+            <div class="card__body">
+              <div class="reading-strip">
+                <% recent.forEach((point) => { const rz = zoneOf(point.zoneKey); %>
+                  <div class="reading-strip__item" style="--zone-color: <%= rz ? rz.color : 'var(--border)' %>">
+                    <div class="reading-strip__time"><%= String(point.t).slice(11, 16) %> น.</div>
+                    <div class="reading-strip__value">
+                      <% if (point.waterLevelM !== null && point.waterLevelM !== undefined) { %>
+                        <%= formatNumber(point.waterLevelM) %><span class="reading-strip__unit"> ม.</span>
+                      <% } else { %>
+                        <span class="reading-strip__unit">—</span>
+                      <% } %>
+                    </div>
+                    <% if (rz) { %>
+                      <div class="reading-strip__time" style="color:<%= rz.color %>">● <%= rz.label %></div>
+                    <% } %>
+                  </div>
+                <% }) %>
+              </div>
+            </div>
+          </section>
+        <% } %>
+
+        <!-- ═══ สรุปวันนี้ ═══ -->
+        <section class="card">
+          <div class="card__header">
+            <h2 class="card__title">สรุปวันนี้</h2>
+            <span class="badge"><%= summary.thaiDate %></span>
+          </div>
+          <div class="card__body">
+            <% if (summary.count > 0) { %>
+              <div class="grid grid--2">
+                <div class="stat">
+                  <div class="stat__label">ระดับสูงสุด</div>
+                  <div class="stat__value" style="color:var(--zone-critical);font-size:1.3rem">
+                    <%= formatNumber(summary.highestMeter) %> ม.
+                  </div>
+                  <div class="stat__hint">เวลา <%= summary.highestAt ? summary.highestAt.slice(0, 5) : '—' %> น.</div>
+                </div>
+                <div class="stat">
+                  <div class="stat__label">ระดับต่ำสุด</div>
+                  <div class="stat__value" style="color:var(--zone-high);font-size:1.3rem">
+                    <%= formatNumber(summary.lowestMeter) %> ม.
+                  </div>
+                  <div class="stat__hint">เวลา <%= summary.lowestAt ? summary.lowestAt.slice(0, 5) : '—' %> น.</div>
+                </div>
+                <div class="stat">
+                  <div class="stat__label">จำนวนครั้งที่วัด</div>
+                  <div class="stat__value" style="font-size:1.3rem"><%= summary.count %></div>
+                </div>
+                <div class="stat">
+                  <div class="stat__label">ส่วนต่าง</div>
+                  <div class="stat__value" style="font-size:1.3rem">
+                    <%= summary.highestMeter !== null && summary.lowestMeter !== null
+                        ? formatNumber(summary.highestMeter - summary.lowestMeter) + ' ม.' : '—' %>
+                  </div>
+                </div>
+              </div>
+            <% } else { %>
+              <p class="muted">ยังไม่มีข้อมูลการวัดในวันนี้</p>
+            <% } %>
+          </div>
+        </section>
+
+        <!-- ═══ ที่ตั้ง — แสดงเฉพาะเมื่อมีพิกัดจริง ไม่งั้นเหลือกล่องเปล่า ═══ -->
+        <% if (station.latitude !== null && station.longitude !== null) { %>
+          <section class="card">
+            <div class="card__header"><h2 class="card__title">ที่ตั้ง</h2></div>
+            <div class="card__body">
+              <p class="mono small muted">
+                <%= formatNumber(station.latitude, 6) %>, <%= formatNumber(station.longitude, 6) %>
+              </p>
+              <a class="btn btn--primary" target="_blank" rel="noopener"
+                 href="https://www.google.com/maps/search/?api=1&query=<%= station.latitude %>,<%= station.longitude %>">
+                เปิดในแผนที่ ↗
+              </a>
+            </div>
+          </section>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ═══ กล่องดูภาพขยาย ═══ -->
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="ภาพขยาย">
+  <button class="lightbox__close" type="button" data-lightbox-close aria-label="ปิด">×</button>
+  <div>
+    <img class="lightbox__img" id="lightboxImage" alt="">
+    <p class="lightbox__caption" id="lightboxCaption"></p>
+  </div>
+</div>
+
+<%- include('../partials/publicFooter') %>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js" defer></script>
+<%- include('../partials/foot', {
+  pageScripts: ['/js/CameraSource.js', '/js/LiveOverlay.js', '/js/WaterChart.js',
+                '/js/Lightbox.js', '/js/StationPage.js']
+}) %>

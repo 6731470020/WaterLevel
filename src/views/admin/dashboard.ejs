@@ -1,0 +1,181 @@
+<%- include('../partials/head') %>
+<%- include('../partials/adminNav') %>
+
+<main class="page">
+  <div class="container">
+    <div class="page__header">
+      <div>
+        <h1 class="page__title">ภาพรวมระบบ</h1>
+        <p class="page__subtitle">สวัสดี <%= currentUser.fullName %> · <%= formatDateTime(new Date()) %></p>
+      </div>
+    </div>
+
+    <% if (license && !license.isValid) { %>
+      <div class="alert alert--danger">
+        ⏳ ใบอนุญาตหมดอายุแล้วเมื่อ <%= formatDateTime(license.expiredAt) %>
+      </div>
+    <% } else if (license && license.isExpiringSoon) { %>
+      <div class="alert alert--warning">
+        ⚠ ใบอนุญาตจะหมดอายุในอีก <%= license.daysRemaining %> วัน
+        (<%= formatDateTime(license.expiredAt) %>)
+      </div>
+    <% } %>
+
+    <!-- ═══ ตัวเลขสรุป ═══ -->
+    <div class="grid grid--4">
+      <div class="stat">
+        <div class="stat__label">จุดวัดทั้งหมด</div>
+        <div class="stat__value"><%= counts.stations %></div>
+        <div class="stat__hint">เปิดใช้งาน <%= counts.active %> จุด</div>
+      </div>
+      <div class="stat <%= counts.critical ? 'stat--danger' : '' %>">
+        <div class="stat__label">อยู่ในโซนวิกฤต</div>
+        <div class="stat__value"><%= counts.critical %></div>
+        <div class="stat__hint">วิกฤตมาก หรือ วิกฤต</div>
+      </div>
+      <div class="stat <%= counts.stale ? 'stat--warning' : '' %>">
+        <div class="stat__label">ขาดการติดต่อ</div>
+        <div class="stat__value"><%= counts.stale %></div>
+        <div class="stat__hint">ไม่มีข้อมูลเกิน 30 นาที</div>
+      </div>
+      <div class="stat <%= validation.failed ? 'stat--warning' : '' %>">
+        <div class="stat__label">ยืนยันค่าไม่ผ่าน (7 วัน)</div>
+        <div class="stat__value"><%= validation.failed %></div>
+        <div class="stat__hint">จากทั้งหมด <%= validation.total %> ครั้ง</div>
+      </div>
+    </div>
+
+    <div class="grid grid--2 mt-3">
+      <!-- ═══ สถานะจุดวัด ═══ -->
+      <section class="card">
+        <div class="card__header">
+          <h2 class="card__title">สถานะจุดวัด</h2>
+          <% if (can('station.read')) { %>
+            <a class="btn btn--sm" href="/admin/stations">ดูทั้งหมด</a>
+          <% } %>
+        </div>
+        <div class="table-wrap" style="border:none">
+          <table class="table">
+            <thead>
+              <tr><th>จุดวัด</th><th>ระดับน้ำ</th><th>สถานะ</th><th>วัดล่าสุด</th></tr>
+            </thead>
+            <tbody>
+              <% if (!stations.length) { %>
+                <tr><td colspan="4" class="table__empty">
+                  ยังไม่มีจุดวัดในระบบ
+                  <% if (can('station.create')) { %>
+                    <br><a href="/admin/stations/new">สร้างจุดวัดแรก</a>
+                  <% } %>
+                </td></tr>
+              <% } %>
+              <% stations.forEach((station) => { %>
+                <tr>
+                  <td>
+                    <a href="/admin/stations/<%= station.id %>"><%= station.name %></a>
+                    <% if (!station.isActive) { %>
+                      <span class="badge">ปิดใช้งาน</span>
+                    <% } %>
+                  </td>
+                  <td class="table__num">
+                    <% if (station.latest) { %>
+                      <% if (station.latest.waterLevelM !== null) { %>
+                        <%= formatNumber(station.latest.waterLevelM) %> ม.
+                      <% } else { %>
+                        <span class="faint">ยังไม่มีค่าเป็นเมตร</span>
+                      <% } %>
+                    <% } else { %>—<% } %>
+                  </td>
+                  <td><%- include('../partials/zoneBadge', { zone: station.latest?.zone ?? null }) %></td>
+                  <td class="small">
+                    <% if (station.latest?.ageMinutes !== null && station.latest?.ageMinutes !== undefined) { %>
+                      <span class="<%= station.latest.ageMinutes > 30 ? 'muted' : '' %>">
+                        <%= station.latest.ageMinutes < 60
+                            ? station.latest.ageMinutes + ' นาทีที่แล้ว'
+                            : Math.floor(station.latest.ageMinutes / 60) + ' ชม.ที่แล้ว' %>
+                      </span>
+                    <% } else { %><span class="muted">ไม่มีข้อมูล</span><% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ═══ การแจ้งเตือนล่าสุด ═══ -->
+      <section class="card">
+        <div class="card__header">
+          <h2 class="card__title">การแจ้งเตือนล่าสุด</h2>
+          <% if (can('alert.read')) { %>
+            <a class="btn btn--sm" href="/admin/alerts">ดูทั้งหมด</a>
+          <% } %>
+        </div>
+        <div class="table-wrap" style="border:none">
+          <table class="table">
+            <thead><tr><th>เวลา</th><th>ชนิด</th><th>โซน</th><th>สถานะ</th></tr></thead>
+            <tbody>
+              <% if (!alerts.length) { %>
+                <tr><td colspan="4" class="table__empty">ยังไม่มีการแจ้งเตือน</td></tr>
+              <% } %>
+              <% alerts.forEach((item) => { %>
+                <tr>
+                  <td class="small nowrap"><%= formatDateTime(item.sentAt || item.createdAt) %></td>
+                  <td><span class="badge"><%= item.messageType %></span></td>
+                  <td>
+                    <%
+                    const zone = zoneLevels.find((z) => z.key === item.zoneKey) ?? null;
+                    %>
+                    <%- include('../partials/zoneBadge', { zone }) %>
+                  </td>
+                  <td>
+                    <span class="badge badge--<%= item.status === 'SENT' ? 'success' : item.status === 'FAILED' ? 'danger' : '' %>">
+                      <%= item.status === 'SENT' ? 'ส่งแล้ว' : item.status === 'FAILED' ? 'ล้มเหลว' : 'รอส่ง' %>
+                    </span>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- ═══ สถานะงานตามเวลา ═══ -->
+    <section class="card mt-3">
+      <div class="card__header"><h2 class="card__title">งานตามเวลา</h2></div>
+      <div class="table-wrap" style="border:none">
+        <table class="table">
+          <thead>
+            <tr><th>งาน</th><th>ตารางเวลา</th><th>สถานะ</th><th>ทำงานล่าสุด</th><th class="table__num">จำนวนรอบ</th></tr>
+          </thead>
+          <tbody>
+            <% jobs.forEach((job) => { %>
+              <tr>
+                <td><%= job.name %></td>
+                <td class="mono small"><%= job.schedule || 'ตามเหตุการณ์' %></td>
+                <td>
+                  <% if (job.isRunning) { %>
+                    <span class="badge badge--primary">กำลังทำงาน</span>
+                  <% } else if (job.lastStatus === 'SUCCESS') { %>
+                    <span class="badge badge--success">สำเร็จ</span>
+                  <% } else if (job.lastStatus === 'FAILED') { %>
+                    <span class="badge badge--danger">ล้มเหลว</span>
+                  <% } else { %>
+                    <span class="badge">รอทำงาน</span>
+                  <% } %>
+                  <% if (!job.scheduled && job.schedule) { %>
+                    <span class="badge badge--warning">ไม่ได้ตั้งเวลา</span>
+                  <% } %>
+                </td>
+                <td class="small"><%= job.lastRunAt ? formatDateTime(job.lastRunAt) : '—' %></td>
+                <td class="table__num"><%= job.runCount %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</main>
+
+<%- include('../partials/foot') %>

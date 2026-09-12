@@ -1,0 +1,188 @@
+<%- include('../partials/head') %>
+<%- include('../partials/adminNav') %>
+
+<%
+/** บทบาทที่แก้สิทธิ์ได้จริง — ใช้ตัดสินว่าจะมีปุ่มบันทึกในคอลัมน์นั้นไหม */
+const editable = roles.filter((role) => canManage && !role.isLocked);
+%>
+
+<main class="page">
+  <div class="container">
+    <div class="page__header">
+      <div>
+        <h1 class="page__title">บทบาทและสิทธิ์</h1>
+        <p class="page__subtitle">
+          ติ๊กในตารางแล้วกดบันทึกที่หัวคอลัมน์ของบทบาทนั้น ·
+          การแก้สิทธิ์จะ<strong>ล้าง session ของผู้ใช้ที่ถือบทบาทนั้นทันที</strong>
+        </p>
+      </div>
+    </div>
+
+    <% if (saved) { %><div class="alert alert--success mb-2">บันทึกสิทธิ์เรียบร้อยแล้ว</div><% } %>
+
+    <%#
+      ฟอร์มของแต่ละบทบาทประกาศไว้นอกตาราง แล้วช่องติ๊กในตารางผูกเข้ามาด้วย
+      แอตทริบิวต์ `form="role-<id>"` — HTML ไม่ยอมให้วาง <form> คร่อมเซลล์ของตาราง
+      วิธีนี้จึงเป็นทางเดียวที่ได้ทั้ง "ตารางติ๊กสิทธิ์" จริง ๆ และปุ่มบันทึกแยกรายบทบาท
+      โดยไม่ต้องพึ่ง JavaScript และไม่ต้องแก้ฝั่งเซิร์ฟเวอร์เลย
+    %>
+    <% editable.forEach((role) => { %>
+      <form id="role-<%= role.id %>" method="post" action="/admin/roles/<%= role.id %>/permissions" hidden>
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      </form>
+    <% }) %>
+
+    <section class="card mb-2">
+      <div class="card__header">
+        <h2 class="card__title">ตารางสิทธิ์</h2>
+        <span class="card__note"><%= roles.length %> บทบาท · <%= catalog.reduce((sum, g) => sum + g.permissions.length, 0) %> สิทธิ์</span>
+      </div>
+      <div class="table-wrap table-wrap--matrix" style="border:none">
+        <table class="table table--matrix">
+          <thead>
+            <tr>
+              <th class="matrix__corner">สิทธิ์</th>
+              <% roles.forEach((role) => { %>
+                <th class="matrix__role">
+                  <div class="matrix__role-name"><%= role.name %></div>
+                  <div class="mono faint matrix__role-key"><%= role.key %></div>
+                  <div class="matrix__role-meta">
+                    <%= role.userCount %> คน · <%= role.permissions.length %> สิทธิ์
+                  </div>
+                  <% if (role.isLocked) { %>
+                    <span class="badge badge--warning">แก้ไม่ได้</span>
+                  <% } else if (canManage) { %>
+                    <button class="btn btn--sm btn--primary" type="submit" form="role-<%= role.id %>"
+                            data-confirm="บันทึกสิทธิ์ของ <%= role.name %>? ผู้ใช้ <%= role.userCount %> คนจะถูกออกจากระบบทันที">
+                      บันทึก
+                    </button>
+                  <% } %>
+                </th>
+              <% }) %>
+            </tr>
+          </thead>
+          <tbody>
+            <% catalog.forEach((group) => { %>
+              <tr class="matrix__section">
+                <th colspan="<%= roles.length + 1 %>"><%= group.resource %></th>
+              </tr>
+              <% group.permissions.forEach((permission) => { %>
+                <tr>
+                  <th class="matrix__label">
+                    <span><%= permission.description %></span>
+                    <span class="mono faint matrix__key"><%= permission.key %></span>
+                  </th>
+                  <% roles.forEach((role) => { %>
+                    <td class="matrix__cell">
+                      <% if (role.isLocked || !canManage) { %>
+                        <span class="matrix__mark <%= role.permissions.includes(permission.key) ? 'is-on' : '' %>"
+                              title="<%= role.permissions.includes(permission.key) ? 'มีสิทธิ์' : 'ไม่มีสิทธิ์' %>">
+                          <%= role.permissions.includes(permission.key) ? '✓' : '·' %>
+                        </span>
+                      <% } else { %>
+                        <input type="checkbox" form="role-<%= role.id %>"
+                               name="permissions" value="<%= permission.key %>"
+                               aria-label="<%= role.name %> — <%= permission.description %>"
+                               <%= role.permissions.includes(permission.key) ? 'checked' : '' %>>
+                      <% } %>
+                    </td>
+                  <% }) %>
+                </tr>
+              <% }) %>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card mb-2">
+      <div class="card__header">
+        <h2 class="card__title">รายละเอียดบทบาท</h2>
+      </div>
+      <div class="table-wrap" style="border:none">
+        <table class="table">
+          <thead>
+            <tr><th>บทบาท</th><th>คีย์</th><th>คำอธิบาย</th>
+                <th class="table__num">ผู้ใช้</th><th>ชนิด</th><% if (canManage) { %><th></th><% } %></tr>
+          </thead>
+          <tbody>
+            <% roles.forEach((role) => { %>
+              <tr>
+                <td><%= role.name %></td>
+                <td class="mono small"><%= role.key %></td>
+                <td class="small muted"><%= role.description || '—' %></td>
+                <td class="table__num"><%= role.userCount %></td>
+                <td>
+                  <% if (role.isSystem) { %><span class="badge">บทบาทระบบ</span>
+                  <% } else { %><span class="badge badge--muted">สร้างเอง</span><% } %>
+                </td>
+                <% if (canManage) { %>
+                  <td class="table__actions">
+                    <% if (!role.isSystem && role.userCount === 0) { %>
+                      <form method="post" action="/admin/roles/<%= role.id %>/delete">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <button class="btn btn--sm btn--danger" type="submit"
+                                data-confirm="ลบบทบาท <%= role.name %>?">ลบ</button>
+                      </form>
+                    <% } %>
+                  </td>
+                <% } %>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <% if (canManage) { %>
+      <details class="card card--details">
+        <summary class="card__header">
+          <h2 class="card__title">+ สร้างบทบาทใหม่</h2>
+          <span class="card__note">คลิกเพื่อเปิด</span>
+        </summary>
+        <form method="post" action="/admin/roles">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <div class="card__body">
+            <div class="grid grid--3">
+              <div class="field">
+                <label class="field__label" for="roleKey">คีย์บทบาท *</label>
+                <input class="input mono" type="text" id="roleKey" name="roleKey" required
+                       pattern="[A-Z][A-Z0-9_]{1,49}" placeholder="SUPERVISOR">
+                <p class="field__hint">ตัวพิมพ์ใหญ่ภาษาอังกฤษ ตัวเลข และขีดล่าง</p>
+              </div>
+              <div class="field">
+                <label class="field__label" for="roleName">ชื่อบทบาท *</label>
+                <input class="input" type="text" id="roleName" name="name" required maxlength="100">
+              </div>
+              <div class="field">
+                <label class="field__label" for="roleDescription">คำอธิบาย</label>
+                <input class="input" type="text" id="roleDescription" name="description" maxlength="255">
+              </div>
+            </div>
+
+            <hr class="rule">
+            <p class="field__label">สิทธิ์ตั้งต้น</p>
+            <div class="perm-picker">
+              <% catalog.forEach((group) => { %>
+                <fieldset class="perm-picker__group">
+                  <legend class="perm-picker__legend"><%= group.resource %></legend>
+                  <% group.permissions.forEach((permission) => { %>
+                    <label class="checkbox small">
+                      <input type="checkbox" name="permissions" value="<%= permission.key %>">
+                      <%= permission.description %>
+                    </label>
+                  <% }) %>
+                </fieldset>
+              <% }) %>
+            </div>
+          </div>
+          <div class="card__footer">
+            <button class="btn btn--primary" type="submit">สร้างบทบาท</button>
+          </div>
+        </form>
+      </details>
+    <% } %>
+  </div>
+</main>
+
+<%- include('../partials/foot') %>

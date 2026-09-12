@@ -1,0 +1,83 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   สไตล์เฉพาะหน้าเครื่องมือวาด ROI
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.roi-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 1rem;
+  align-items: start;
+}
+
+.roi-canvas-wrap {
+  background: #0f172a;
+  border-radius: var(--radius-sm);
+  overflow: auto;
+  max-height: 70vh;
+}
+
+.roi-canvas-wrap canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.roi-sidebar { position: sticky; top: 1rem; }
+
+/* รายการ ROI ในแผงด้านข้าง */
+.roi-item {
+  display: flex; align-items: center; gap: .6rem; width: 100%;
+  padding: .5rem .6rem; margin-bottom: .35rem;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); cursor: pointer;
+  font: inherit; color: inherit; text-align: left;
+}
+.roi-item:hover { background: var(--surface-2); }
+.roi-item.is-active {
+  border-color: var(--roi-color);
+  background: color-mix(in srgb, var(--roi-color) 10%, white);
+}
+.roi-item__swatch {
+  width: .65rem; height: 2rem; border-radius: 3px;
+  background: var(--roi-color); flex-shrink: 0;
+}
+.roi-item__body { display: flex; flex-direction: column; min-width: 0; }
+.roi-item__name {
+  font-weight: 600; font-size: .875rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.roi-item__meta { font-size: .75rem; color: var(--text-muted); }
+
+/* แถวแก้ไขโซน */
+.zone-editor {
+  display: grid;
+  grid-template-columns: .6rem 1fr;
+  grid-template-areas: 'swatch label' '. controls' '. meter' '. alert';
+  gap: .3rem .55rem;
+  padding: .5rem .6rem; margin-bottom: .4rem;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  border-left: 3px solid var(--zone-color);
+}
+.zone-editor__swatch {
+  grid-area: swatch; width: .6rem; height: 1rem;
+  border-radius: 2px; background: var(--zone-color);
+}
+.zone-editor__label { grid-area: label; font-size: .85rem; font-weight: 600; }
+.zone-editor__controls {
+  grid-area: controls; display: flex; align-items: center; gap: .2rem; flex-wrap: wrap;
+}
+.zone-editor__input { width: 4.5rem; text-align: center; }
+.zone-editor__meter {
+  grid-area: meter; display: flex; align-items: center; gap: .35rem; font-size: .78rem;
+}
+.zone-editor__meter input { width: 5rem; text-align: right; }
+.zone-editor__meter-label { color: var(--muted); }
+.zone-editor__unit { color: var(--muted); }
+.zone-editor__alert { grid-area: alert; font-size: .78rem; }
+
+@media (max-width: 1024px) {
+  .roi-layout { grid-template-columns: 1fr; }
+  .roi-sidebar { position: static; }
+}

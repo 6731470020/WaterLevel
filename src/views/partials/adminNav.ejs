@@ -1,0 +1,51 @@
+<%
+/**
+ * แถบนำทางของหน้าผู้ดูแล
+ *
+ * ⚠️ `can()` ใช้ซ่อนเมนูที่ผู้ใช้ไม่มีสิทธิ์ — **เป็นเพียงประสบการณ์ผู้ใช้**
+ * ไม่ใช่ความปลอดภัย การป้องกันจริงอยู่ที่ middleware และชั้น Service
+ * (CLAUDE.md ข้อ 8.4 ชั้นที่ 3)
+ */
+const links = [
+  { href: '/admin',              label: 'ภาพรวม',          permission: null },
+  { href: '/admin/stations',     label: 'จุดวัด',           permission: 'station.read' },
+  { href: '/admin/measurements', label: 'ค่าวัด',           permission: 'measurement.read' },
+  { href: '/admin/alerts',       label: 'การแจ้งเตือน',      permission: 'alert.read' },
+  { href: '/admin/reports',      label: 'รายงาน',           permission: 'report.read' },
+  { href: '/admin/line',         label: 'LINE',            permission: 'line.read' },
+  { href: '/admin/users',        label: 'ผู้ใช้',            permission: 'user.read' },
+  { href: '/admin/roles',        label: 'บทบาทและสิทธิ์',    permission: 'role.read' },
+  { href: '/admin/audit',        label: 'บันทึกการใช้งาน',   permission: 'audit.read' },
+  { href: '/admin/settings',     label: 'ตั้งค่า',           permission: 'setting.read' },
+].filter((link) => link.permission === null || can(link.permission));
+%>
+<header class="app-header">
+  <div class="app-header__bar">
+    <a class="app-header__brand" href="/admin">
+      <span class="app-header__logo" aria-hidden="true">💧</span>
+      <span>ระบบวัดระดับน้ำ</span>
+    </a>
+
+    <button class="app-header__toggle" type="button" data-nav-toggle aria-expanded="false"
+            aria-controls="adminNav" aria-label="เปิด/ปิดเมนู">☰</button>
+
+    <div class="app-header__user">
+      <a href="/" class="app-header__link" target="_blank" rel="noopener">ดูหน้าสาธารณะ ↗</a>
+      <span class="app-header__name"><%= currentUser.fullName %></span>
+      <a href="/account/sessions" class="app-header__link">อุปกรณ์</a>
+      <form method="post" action="/logout" class="app-header__logout">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button type="submit" class="btn btn--ghost btn--sm">ออกจากระบบ</button>
+      </form>
+    </div>
+  </div>
+
+  <nav class="app-nav" id="adminNav" aria-label="เมนูหลัก">
+    <% links.forEach((link) => { %>
+      <a href="<%= link.href %>"
+         class="app-nav__item <%= currentPath === link.href || (link.href !== '/admin' && currentPath.startsWith(link.href)) ? 'is-active' : '' %>">
+        <%= link.label %>
+      </a>
+    <% }) %>
+  </nav>
+</header>

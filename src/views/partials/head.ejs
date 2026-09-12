@@ -1,0 +1,65 @@
+<%
+/**
+ * ส่วนหัวของทุกหน้า — เปิด <html> จนถึงเปิด <body>
+ *
+ * EJS ล้วนไม่มีระบบ layout ในตัว จึงใช้ partial คู่ head/foot แทน
+ * ทุกหน้าเรียก include partial 'head' ก่อนเนื้อหา และ 'foot' ปิดท้าย
+ *
+ * ตัวแปรที่ใช้ (มาจาก res.locals หรือจาก controller):
+ * - title   หัวข้อหน้า
+ * - seo     ข้อมูล SEO (null บนหน้าผู้ดูแล)
+ * - jsonLd  Structured Data (null บนหน้าผู้ดูแล)
+ */
+/* อ่านค่าแบบทนทาน — หน้านี้ถูกใช้โดย error.ejs ด้วย ซึ่งอาจถูกเรนเดอร์เมื่อคำขอ
+   ล้มเหลว **ก่อน** middleware ที่ตั้ง res.locals จะได้ทำงาน (เช่น body ผิดรูปแบบ)
+   หน้าแสดงข้อผิดพลาดต้องไม่พังเองไม่ว่ากรณีใด */
+const pageSeo = typeof seo !== 'undefined' ? seo : null;
+const pageJsonLd = typeof jsonLd !== 'undefined' ? jsonLd : null;
+const pageCsrfToken = typeof csrfToken !== 'undefined' ? (csrfToken || '') : '';
+const pageBodyClass = typeof bodyClass !== 'undefined' ? bodyClass : '';
+const styles = typeof pageStyles !== 'undefined' ? pageStyles : [];
+const pageTitle = (pageSeo && pageSeo.title)
+  || (typeof title !== 'undefined' ? title : 'ระบบวัดระดับน้ำอัตโนมัติ');
+%><!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= pageTitle %> — ระบบวัดระดับน้ำอัตโนมัติ</title>
+
+  <% if (pageSeo) { %>
+    <meta name="description" content="<%= pageSeo.description %>">
+    <meta name="keywords" content="<%= pageSeo.keywords %>">
+    <link rel="canonical" href="<%= pageSeo.canonical %>">
+
+    <meta property="og:type" content="<%= pageSeo.ogType %>">
+    <meta property="og:url" content="<%= pageSeo.canonical %>">
+    <meta property="og:title" content="<%= pageSeo.title %>">
+    <meta property="og:description" content="<%= pageSeo.description %>">
+    <meta property="og:image" content="<%= pageSeo.ogImage %>">
+    <meta property="og:site_name" content="<%= pageSeo.siteName %>">
+    <meta property="og:locale" content="<%= pageSeo.locale %>">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="<%= pageSeo.title %>">
+    <meta name="twitter:description" content="<%= pageSeo.description %>">
+    <meta name="twitter:image" content="<%= pageSeo.ogImage %>">
+  <% } else { %>
+    <meta name="robots" content="noindex, nofollow">
+  <% } %>
+
+  <% if (pageCsrfToken) { %>
+    <meta name="csrf-token" content="<%= pageCsrfToken %>">
+  <% } %>
+  <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+  <% styles.forEach((href) => { %><link rel="stylesheet" href="<%= href %>"><% }) %>
+
+  <% if (pageJsonLd) { %>
+    <script type="application/ld+json"><%- JSON.stringify(pageJsonLd) %></script>
+  <% } %>
+</head>
+<body class="<%= pageBodyClass %>">

@@ -1,0 +1,36 @@
+<%- include('../partials/head', { bodyClass: 'license-page' }) %>
+
+<main class="license-card">
+  <div class="license-card__icon" aria-hidden="true">⏳</div>
+  <h1>ใบอนุญาตใช้งานหมดอายุ</h1>
+  <p class="muted">
+    ใบอนุญาตใช้งานระบบวัดระดับน้ำอัตโนมัติหมดอายุแล้ว
+    ระบบจึงหยุดให้บริการชั่วคราวจนกว่าจะต่ออายุ
+  </p>
+  <p class="muted small">
+    ข้อมูลทั้งหมดของท่านยังอยู่ครบถ้วนและจะกลับมาใช้งานได้ทันทีเมื่อต่ออายุเรียบร้อย
+  </p>
+
+  <% if (contact.email || contact.phone || contact.line) { %>
+    <dl class="license-card__contact">
+      <% if (contact.phone) { %>
+        <dt>โทรศัพท์</dt>
+        <dd><a href="tel:<%= contact.phone.replace(/[^0-9+]/g, '') %>"><%= contact.phone %></a></dd>
+      <% } %>
+      <% if (contact.email) { %>
+        <dt>อีเมล</dt>
+        <dd><a href="mailto:<%= contact.email %>"><%= contact.email %></a></dd>
+      <% } %>
+      <% if (contact.line) { %>
+        <dt>LINE</dt>
+        <dd><%= contact.line %></dd>
+      <% } %>
+    </dl>
+  <% } %>
+
+  <div class="mt-3">
+    <a class="btn btn--primary" href="/login">เข้าสู่ระบบผู้ดูแล</a>
+  </div>
+</main>
+
+<%- include('../partials/foot') %>

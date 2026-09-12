@@ -1,0 +1,45 @@
+<%- include('../partials/head', { bodyClass: 'auth-page' }) %>
+
+<main class="auth-card">
+  <div class="auth-card__brand">
+    <div class="auth-card__logo" aria-hidden="true">💧</div>
+    <h1 class="auth-card__title">ระบบวัดระดับน้ำอัตโนมัติ</h1>
+    <p class="auth-card__subtitle">กรุณาเข้าสู่ระบบเพื่อใช้งานส่วนผู้ดูแล</p>
+  </div>
+
+  <% if (error) { %>
+    <div class="alert alert--danger" role="alert"><%= error %></div>
+  <% } %>
+  <% if (query.expired === '1') { %>
+    <div class="alert alert--warning">ออกจากระบบอัตโนมัติเนื่องจากไม่มีการใช้งานเป็นเวลานาน</div>
+  <% } %>
+  <% if (query.logout === 'all') { %>
+    <div class="alert alert--info">ออกจากระบบทุกอุปกรณ์เรียบร้อยแล้ว</div>
+  <% } %>
+
+  <form method="post" action="/login" autocomplete="on">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="hidden" name="next" value="<%= next %>">
+
+    <div class="field">
+      <label class="field__label" for="username">ชื่อผู้ใช้หรืออีเมล</label>
+      <input class="input" type="text" id="username" name="username"
+             value="<%= username %>" required autofocus autocomplete="username">
+    </div>
+
+    <div class="field">
+      <label class="field__label" for="password">รหัสผ่าน</label>
+      <input class="input" type="password" id="password" name="password"
+             required autocomplete="current-password">
+    </div>
+
+    <button class="btn btn--primary btn--block" type="submit">เข้าสู่ระบบ</button>
+  </form>
+
+  <p class="auth-card__links">
+    <a href="/forgot-password">ลืมรหัสผ่าน?</a> ·
+    <a href="/">กลับหน้าสาธารณะ</a>
+  </p>
+</main>
+
+<%- include('../partials/foot') %>

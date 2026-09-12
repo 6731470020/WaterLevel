@@ -1,0 +1,137 @@
+<%- include('../partials/head') %>
+<%- include('../partials/adminNav') %>
+
+<main class="page">
+  <div class="container">
+    <div class="page__header">
+      <div>
+        <h1 class="page__title">รายงานประจำวัน</h1>
+        <p class="page__subtitle">สร้างอัตโนมัติทุกวันเวลา 18:00 น. · แสดงวันที่เป็น พ.ศ.</p>
+      </div>
+      <% if (can('report.generate')) { %>
+        <div class="page__actions">
+          <select class="select input--sm" id="genStation" style="width:auto">
+            <% stations.forEach((station) => { %>
+              <option value="<%= station.id %>"><%= station.name %></option>
+            <% }) %>
+          </select>
+          <input class="input input--sm" type="date" id="genDate" style="width:auto"
+                 value="<%= new Date().toLocaleDateString('sv-SE') %>">
+          <button class="btn" type="button" id="generateReport">สร้างรายงาน</button>
+          <% if (can('report.send')) { %>
+            <button class="btn btn--primary" type="button" id="sendReport">สร้างและส่ง</button>
+          <% } %>
+        </div>
+      <% } %>
+    </div>
+
+    <form class="filters" method="get" action="/admin/reports">
+      <div class="field">
+        <label class="field__label" for="stationId">จุดวัด</label>
+        <select class="select input--sm" id="stationId" name="stationId" data-auto-submit>
+          <option value="">ทุกจุดวัด</option>
+          <% stations.forEach((station) => { %>
+            <option value="<%= station.id %>"
+                    <%= String(query.stationId) === String(station.id) ? 'selected' : '' %>>
+              <%= station.name %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field__label" for="from">ตั้งแต่วันที่</label>
+        <input class="input input--sm" type="date" id="from" name="from" value="<%= query.from || '' %>">
+      </div>
+      <div class="field">
+        <label class="field__label" for="to">ถึงวันที่</label>
+        <input class="input input--sm" type="date" id="to" name="to" value="<%= query.to || '' %>">
+      </div>
+      <button class="btn btn--sm btn--primary" type="submit">กรอง</button>
+      <a class="btn btn--sm" href="/admin/reports">ล้าง</a>
+      <%# ปุ่มพิมพ์ต้องพาตัวกรองชุดเดียวกันไปด้วย ไม่งั้นเอกสารจะไม่ตรงกับที่เห็นบนจอ %>
+      <a class="btn btn--sm" id="printReport" target="_blank" rel="noopener"
+         href="/admin/reports/print">🖨 บันทึกเป็น PDF (A4)</a>
+    </form>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>วันที่ (พ.ศ.)</th>
+            <th class="table__num">สูงสุด</th>
+            <th class="table__num">ต่ำสุด</th>
+            <th class="table__num">ปัจจุบัน</th>
+            <th class="table__num">ส่วนต่าง</th>
+            <th class="table__num">จำนวนครั้ง</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (!reports.length) { %>
+            <tr><td colspan="6" class="table__empty">ยังไม่มีรายงาน</td></tr>
+          <% } %>
+          <% reports.forEach((report) => { %>
+            <tr>
+              <td class="nowrap"><%= report.thaiDate %></td>
+              <td class="table__num">
+                <strong style="color:var(--zone-critical)"><%= formatNumber(report.highest.meter) %> ม.</strong>
+                <br><span class="small faint">
+                  <%= report.highest.at ? report.highest.at.slice(0, 5) + ' น.' : '' %>
+                </span>
+              </td>
+              <td class="table__num">
+                <strong style="color:var(--zone-high)"><%= formatNumber(report.lowest.meter) %> ม.</strong>
+                <br><span class="small faint">
+                  <%= report.lowest.at ? report.lowest.at.slice(0, 5) + ' น.' : '' %>
+                </span>
+              </td>
+              <td class="table__num mono"><%= formatNumber(report.currentMeter) %> ม.</td>
+              <td class="table__num mono"><%= formatNumber(report.rangeMeter) %> ม.</td>
+              <td class="table__num"><%= report.measurementCount %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+
+    <%- include('../partials/pagination') %>
+  </div>
+</main>
+
+<script>
+/** สั่งสร้าง (และส่ง) รายงานผ่าน API */
+async function runReport(send) {
+  const stationId = document.getElementById('genStation').value;
+  const date = document.getElementById('genDate').value;
+  if (!stationId || !date) return;
+
+  try {
+    const result = await window.AppShell.api(
+      `/api/admin/stations/${stationId}/reports/${send ? 'send' : 'generate'}`,
+      { method: 'POST', body: { date } });
+    window.AppShell.toast(
+      send
+        ? (result.sent ? 'สร้างและส่งรายงานเรียบร้อยแล้ว' : 'สร้างรายงานแล้วแต่ส่งไม่สำเร็จ')
+        : `สร้างรายงานแล้ว (${result.report.measurementCount} ค่าวัด)`,
+      send && !result.sent ? 'warning' : 'success');
+    setTimeout(() => window.location.reload(), 1400);
+  } catch (error) {
+    window.AppShell.toast(error.message, 'danger');
+  }
+}
+
+document.getElementById('generateReport')?.addEventListener('click', () => runReport(false));
+document.getElementById('sendReport')?.addEventListener('click', () => runReport(true));
+
+/* พาค่าที่กรอกอยู่ในฟอร์มไปด้วย รวมถึงค่าที่ผู้ใช้เพิ่งแก้แต่ยังไม่กดกรอง */
+document.getElementById('printReport')?.addEventListener('click', (event) => {
+  const params = new URLSearchParams();
+  for (const id of ['stationId', 'from', 'to']) {
+    const value = document.getElementById(id)?.value;
+    if (value) params.set(id, value);
+  }
+  params.set('auto', '1');
+  event.currentTarget.href = `/admin/reports/print?${params}`;
+});
+</script>
+
+<%- include('../partials/foot') %>

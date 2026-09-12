@@ -1,0 +1,48 @@
+<%
+/**
+ * หน้าแสดงข้อผิดพลาดรวม
+ *
+ * ⚠️ ต้องเรนเดอร์ได้เสมอแม้ `res.locals` จะยังไม่ถูกตั้ง — คำขอที่ล้มเหลวตั้งแต่
+ * ชั้นอ่านเนื้อคำขอจะมาถึงที่นี่โดยไม่ผ่าน middleware ที่เติม locals
+ * ค่าที่ใช้จึงต้องมีทางถอยทุกตัว
+ */
+const isSignedIn = typeof currentUser !== 'undefined' && currentUser;
+%><%- include('partials/head') %>
+
+<main class="page">
+  <div class="container container--narrow">
+    <div class="card">
+      <div class="card__body text-center">
+        <p style="font-size:3rem;margin:0" aria-hidden="true">
+          <%= statusCode === 404 ? '🔍' : statusCode === 403 ? '🚫' : statusCode === 402 ? '⏳' : '⚠️' %>
+        </p>
+        <h1><%= title %></h1>
+        <p class="muted"><%= message %></p>
+
+        <% if (details && details.length) { %>
+          <ul style="text-align:left;display:inline-block" class="small muted">
+            <% details.forEach((item) => { %>
+              <li><%= item.message || JSON.stringify(item) %></li>
+            <% }) %>
+          </ul>
+        <% } %>
+
+        <div class="flex flex--center mt-3" style="justify-content:center">
+          <a class="btn" href="javascript:history.back()">ย้อนกลับ</a>
+          <a class="btn btn--primary" href="<%= isSignedIn ? '/admin' : '/' %>">ไปหน้าแรก</a>
+        </div>
+
+        <% if (requestId) { %>
+          <p class="faint small mt-3">รหัสอ้างอิงคำขอ: <span class="mono"><%= requestId %></span></p>
+        <% } %>
+
+        <% if (stack) { %>
+          <pre style="text-align:left;overflow:auto;font-size:.75rem;background:var(--surface-2);
+                      padding:1rem;border-radius:var(--radius);margin-top:1rem"><%= stack %></pre>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</main>
+
+<%- include('partials/foot') %>

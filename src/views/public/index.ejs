@@ -1,0 +1,119 @@
+<%- include('../partials/head') %>
+<%- include('../partials/publicNav') %>
+
+<main class="page">
+  <div class="container">
+    <header class="station-hero">
+      <div class="station-hero__inner">
+        <span class="station-hero__mark" aria-hidden="true">💧</span>
+        <div class="station-hero__text">
+          <h1 class="station-hero__title">สถานะระดับน้ำล่าสุด</h1>
+          <p class="station-hero__subtitle">
+            ข้อมูลจากกล้องวงจรปิดพร้อมการตรวจจับด้วยปัญญาประดิษฐ์ · อัปเดตทุก 5 นาที
+          </p>
+        </div>
+        <div class="station-hero__aside">
+          <span class="station-hero__chip">📍 <%= stations.length %> จุดวัด</span>
+          <span class="station-hero__chip" id="lastRefresh">อัปเดตเมื่อสักครู่</span>
+        </div>
+      </div>
+    </header>
+
+    <% if (!stations.length) { %>
+      <div class="card"><div class="card__body table__empty">
+        ยังไม่มีจุดวัดที่เปิดใช้งานในระบบ
+      </div></div>
+    <% } %>
+
+    <div class="tile-grid">
+      <% stations.forEach((station) => { %>
+        <%
+        const latest = station.latest;
+        const zone = latest?.zone ?? null;
+        const zoneColor = zone ? zone.color : 'var(--zone-normal)';
+        const isStale = latest === null || (latest.ageMinutes ?? 999) > 30;
+        %>
+        <a class="tile" href="<%= station.publicPath %>"
+           style="--zone-color: <%= zoneColor %>"
+           aria-label="ดูรายละเอียดจุดวัด <%= station.name %>">
+
+          <%# ภาพล่าสุดเป็นพื้นหลัง — บอกสถานการณ์ได้เร็วกว่าตัวเลขเปล่า %>
+          <% if (latest && (latest.imageUrl || latest.thumbnailUrl)) { %>
+            <%# ให้เบราว์เซอร์เลือกขนาดเอง — หน้านี้รีเฟรชทุกนาที ภาพเต็มทุกใบหนักเกินจำเป็น %>
+            <img class="tile__media" alt="" aria-hidden="true" loading="lazy" decoding="async"
+                 src="<%= latest.thumbnailUrl || latest.imageUrl %>"
+                 <% if (latest.thumbnailUrl && latest.imageUrl) { %>
+                 srcset="<%= latest.thumbnailUrl %> 320w, <%= latest.imageUrl %> 720w"
+                 sizes="(max-width: 700px) 100vw, (max-width: 1100px) 50vw, 33vw"
+                 <% } %>>
+          <% } else { %>
+            <span class="tile__media--empty" aria-hidden="true"></span>
+          <% } %>
+          <span class="tile__scrim" aria-hidden="true"></span>
+          <span class="tile__accent" aria-hidden="true"></span>
+
+          <div class="tile__body">
+            <h2 class="tile__name"><%= station.name %></h2>
+
+            <div class="tile__spacer"></div>
+
+            <% if (latest) { %>
+              <div class="tile__value">
+                <% if (latest.waterLevelM !== null) { %>
+                  <%= formatNumber(latest.waterLevelM) %><span class="tile__unit">ม.</span>
+                <% } else { %>
+                  <span class="tile__unavailable">ยังไม่มีค่าเป็นเมตร</span>
+                <% } %>
+              </div>
+
+              <div class="tile__chips">
+                <% if (zone) { %>
+                  <span class="tile__chip tile__chip--zone"
+                        style="--zone-text: <%= zone.severity <= 3 ? '#ffffff' : '#0f172a' %>">
+                    <%= zone.label %>
+                  </span>
+                <% } %>
+                <% if (latest.isEstimate) { %>
+                  <span class="tile__chip tile__chip--warn"
+                        title="ผิวน้ำอยู่ที่ขอบล่างของภาพ — ระดับจริงอาจต่ำกว่านี้">ค่าประมาณ</span>
+                <% } %>
+                <% if (isStale) { %>
+                  <span class="tile__chip tile__chip--warn">ข้อมูลค้าง</span>
+                <% } %>
+              </div>
+
+              <p class="tile__meta"><%= latest.measuredAtText %></p>
+            <% } else { %>
+              <div class="tile__unavailable">ยังไม่มีข้อมูลการวัด</div>
+              <p class="tile__meta">รอค่าวัดครั้งแรกจากกล้อง</p>
+            <% } %>
+
+            <p class="tile__meta tile__go">ดูกราฟและภาพย้อนหลัง →</p>
+          </div>
+        </a>
+      <% }) %>
+    </div>
+
+    <section class="card mt-3">
+      <div class="card__header"><h2 class="card__title">ระดับการเตือนภัย 6 ระดับ</h2></div>
+      <div class="card__body">
+        <%# แถบกะทัดรัดแทนตาราง 6 แถวเต็มความกว้าง — เป็นคำอธิบายสี ไม่ใช่ข้อมูลหลัก %>
+        <div class="zone-legend">
+          <% zoneLevels.forEach((zone) => { %>
+            <span class="zone-legend__item" style="--zone-color: <%= zone.color %>">
+              <span class="zone-legend__dot" aria-hidden="true"></span>
+              <%= zone.label %>
+              <span class="zone-legend__rank">ระดับ <%= zone.severity %></span>
+            </span>
+          <% }) %>
+        </div>
+        <p class="small faint mt-1">
+          เรียงจากร้ายแรงที่สุดไปน้อยที่สุด · เกณฑ์ระดับน้ำเป็นเมตรของแต่ละจุดวัดดูได้ในหน้าจุดวัดนั้น
+        </p>
+      </div>
+    </section>
+  </div>
+</main>
+
+<%- include('../partials/publicFooter') %>
+<%- include('../partials/foot', { pageScripts: ['/js/AutoRefresh.js'] }) %>

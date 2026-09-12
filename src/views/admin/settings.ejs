@@ -1,0 +1,348 @@
+<%- include('../partials/head') %>
+<%- include('../partials/adminNav') %>
+
+<%
+/** ค่าตั้งค่าเฉพาะกลุ่มที่กำลังเปิดอยู่ */
+const groupSettings = settings.filter((item) => item.group === tab && item.type !== 'drivers');
+const activeGroup = groups.find((item) => item.key === tab) || null;
+%>
+
+<main class="page">
+  <div class="container">
+    <div class="page__header">
+      <div>
+        <h1 class="page__title">ตั้งค่าระบบ</h1>
+        <p class="page__subtitle">
+          ค่าทั้งหมดในหน้านี้เก็บในฐานข้อมูลและมีผลทันทีโดยไม่ต้องรีสตาร์ต ·
+          ค่าที่ยังไม่เคยตั้งจะใช้ค่าจาก <span class="mono">.env</span> เป็นค่าตั้งต้น
+        </p>
+      </div>
+    </div>
+
+    <% if (saved) { %>
+      <div class="alert alert--success mb-2">บันทึกค่าตั้งค่าเรียบร้อยแล้ว — มีผลกับการทำงานครั้งถัดไปทันที</div>
+    <% } %>
+    <% if (synced === '1') { %>
+      <div class="alert alert--success mb-2">ตรวจสอบคีย์กับผู้ให้บริการเรียบร้อยแล้ว</div>
+    <% } %>
+    <% if (synced === '0') { %>
+      <div class="alert alert--warning mb-2">
+        ตรวจสอบคีย์ไม่สำเร็จ — <%= registry.lastSync ? registry.lastSync.message : 'ไม่ทราบสาเหตุ' %><br>
+        ระบบยังใช้วันหมดอายุที่ซิงก์มาได้ครั้งล่าสุดต่อไป
+      </div>
+    <% } %>
+
+    <nav class="tabs">
+      <% groups.forEach((group) => { %>
+        <a class="tabs__item <%= tab === group.key ? 'is-active' : '' %>"
+           href="/admin/settings?tab=<%= group.key %>">
+          <span aria-hidden="true"><%= group.icon %></span> <%= group.label %>
+          <% if (group.fromDatabase) { %><span class="tabs__count"><%= group.fromDatabase %></span><% } %>
+        </a>
+      <% }) %>
+      <a class="tabs__item <%= tab === 'status' ? 'is-active' : '' %>" href="/admin/settings?tab=status">
+        <span aria-hidden="true">📊</span> สถานะระบบ
+      </a>
+    </nav>
+
+    <% if (tab === 'status') { %>
+      <div class="grid grid--2">
+        <section class="card">
+          <div class="card__header">
+            <h2 class="card__title">ไดรเวอร์ที่ใช้อยู่</h2>
+            <button class="btn btn--sm btn--primary" type="button" id="testConnections">ทดสอบการเชื่อมต่อ</button>
+          </div>
+          <div class="table-wrap" style="border:none">
+            <table class="table">
+              <thead><tr><th>บริการ</th><th>ไดรเวอร์</th><th>ผลการทดสอบ</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>บริการตรวจจับ</td>
+                  <td><span class="badge badge--primary"><%= drivers.detection %></span></td>
+                  <td id="detectionStatus" class="small muted">
+                    <%= drivers.detection === 'mock' ? 'ข้อมูลจำลอง ไม่เรียกบริการภายนอก' : 'เรียก API ตรวจจับจริง' %>
+                  </td>
+                </tr>
+                <tr>
+                  <td>ช่องทางแจ้งเตือน</td>
+                  <td><span class="badge badge--primary"><%= drivers.notification %></span></td>
+                  <td id="notificationStatus" class="small muted">
+                    <%= drivers.notification === 'console' ? 'พิมพ์ลงคอนโซล ไม่ส่งจริง' : 'ส่งออกช่องทางจริง' %>
+                  </td>
+                </tr>
+                <tr>
+                  <td>อีเมล (SMTP)</td>
+                  <td><span class="badge badge--primary"><%= drivers.mail %></span></td>
+                  <td id="mailStatus" class="small muted">
+                    <%= drivers.mail === 'smtp' ? 'ตั้งค่าเซิร์ฟเวอร์เมลไว้แล้ว' : 'ยังไม่ได้ตั้งค่า — พิมพ์ลิงก์ลงคอนโซล' %>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card__header"><h2 class="card__title">งานตามเวลา</h2></div>
+          <div class="table-wrap" style="border:none">
+            <table class="table">
+              <thead><tr><th>งาน</th><th>ตารางเวลา</th><th>สถานะ</th></tr></thead>
+              <tbody>
+                <% jobs.forEach((job) => { %>
+                  <tr>
+                    <td><%= job.name %></td>
+                    <td class="mono small"><%= job.schedule || 'ตามเหตุการณ์' %></td>
+                    <td>
+                      <span class="badge badge--<%= job.scheduled || !job.schedule ? 'success' : 'warning' %>">
+                        <%= job.scheduled ? 'ตั้งเวลาแล้ว' : (job.schedule ? 'ไม่ได้ตั้งเวลา' : 'รับเหตุการณ์') %>
+                      </span>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <% const key = registry.lastSync && registry.lastSync.keyInfo; %>
+      <section class="card mt-2">
+        <div class="card__header">
+          <div>
+            <h2 class="card__title">คีย์บริการตรวจจับ (ใบอนุญาตใช้งาน)</h2>
+            <p class="card__subtitle">
+              คีย์ที่ผู้ให้บริการออกให้มีวันหมดอายุติดมาด้วย — ระบบถามสถานะจาก
+              <span class="mono">GET /key-info</span> ทุก 6 ชั่วโมงและตอนเริ่มระบบ
+            </p>
+          </div>
+          <% if (canManageLicense && registry.configured) { %>
+            <form method="post" action="/admin/license/sync">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button class="btn btn--sm btn--primary" type="submit">ตรวจสอบคีย์เดี๋ยวนี้</button>
+            </form>
+          <% } %>
+        </div>
+        <div class="table-wrap" style="border:none">
+          <table class="table">
+            <tbody>
+              <% if (!registry.configured) { %>
+                <tr>
+                  <td class="table__empty">
+                    ยังไม่ได้กรอกคีย์บริการตรวจจับ —
+                    <a href="/admin/settings?tab=detection">กรอกที่แท็บบริการตรวจจับ</a>
+                    <% if (license) { %>
+                      <br><span class="small">ระหว่างนี้ใช้ใบอนุญาตตั้งต้น
+                      <span class="mono"><%= license.licenseKey %></span>
+                      ถึง <%= formatDateTime(license.expiredAt) %></span>
+                    <% } %>
+                  </td>
+                </tr>
+              <% } else if (!key) { %>
+                <tr>
+                  <td class="table__empty">
+                    ยังไม่เคยตรวจสำเร็จในรอบการทำงานนี้
+                    <% if (registry.lastSync && !registry.lastSync.ok) { %>
+                      <br><span class="small">ครั้งล่าสุด: <%= registry.lastSync.message %></span>
+                    <% } %>
+                  </td>
+                </tr>
+              <% } else { %>
+                <tr><th style="width:14rem">คีย์ที่ใช้อยู่</th><td class="mono"><%= key.maskedKey %></td></tr>
+                <tr>
+                  <th>ผู้ถือคีย์</th>
+                  <td>
+                    <%= key.ownerName %><%= key.company ? ' · ' + key.company : '' %>
+                    <% if (key.plan) { %><span class="badge badge--primary"><%= key.plan %></span><% } %>
+                  </td>
+                </tr>
+                <tr>
+                  <th>วันหมดอายุ</th>
+                  <td><%= key.isPerpetual ? 'ไม่มีวันหมดอายุ (ตลอดชีพ)' : formatDateTime(key.expiresAt) %></td>
+                </tr>
+                <tr>
+                  <th>สถานะ</th>
+                  <td>
+                    <% if (!key.isUsable) { %>
+                      <span class="badge badge--danger">
+                        <%= key.status === 'revoked' ? 'ถูกยกเลิกโดยผู้ให้บริการ' : 'หมดอายุแล้ว' %>
+                      </span>
+                      <span class="small muted">— การตรวจวัดอัตโนมัติจะหยุดทำงาน กรุณาติดต่อผู้ให้บริการ</span>
+                    <% } else if (key.isPerpetual) { %>
+                      <span class="badge badge--success">ใช้งานได้</span>
+                    <% } else { %>
+                      <span class="badge badge--<%= key.daysRemaining <= 30 ? 'warning' : 'success' %>">
+                        เหลืออีก <%= key.daysRemaining %> วัน
+                      </span>
+                    <% } %>
+                  </td>
+                </tr>
+                <tr>
+                  <th>การใช้งาน</th>
+                  <td class="small muted">
+                    เรียกใช้สะสม <%= Number(key.usageCount).toLocaleString('th-TH') %> ครั้ง ·
+                    ตรวจล่าสุด <%= formatDateTime(registry.lastSync.checkedAt) %>
+                  </td>
+                </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    <% } else { %>
+      <section class="card">
+        <div class="card__header">
+          <div>
+            <h2 class="card__title"><%= activeGroup.icon %> <%= activeGroup.label %></h2>
+            <p class="card__subtitle"><%= activeGroup.description %></p>
+          </div>
+          <% if (!canManage) { %><span class="card__note">ต้องมีสิทธิ์ setting.manage จึงจะแก้ได้</span><% } %>
+        </div>
+
+        <form method="post" action="/admin/settings/notifications">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="tab" value="<%= tab %>">
+          <fieldset class="settings-fieldset" <%= canManage ? '' : 'disabled' %>>
+            <div class="card__body">
+
+              <% if (tab === 'notification') { %>
+                <div class="field">
+                  <span class="field__label">ส่งผ่านช่องทางใดบ้าง</span>
+                  <%# ช่องซ่อนนี้ทำให้ "ไม่ติ๊กเลย" ส่งค่ามาถึงเซิร์ฟเวอร์ได้ — ไม่งั้นเบราว์เซอร์
+                      จะไม่ส่งฟิลด์นี้เลย และระบบจะตีความว่า "ไม่เปลี่ยน" ทำให้ปิดทุกช่องทางไม่ได้ %>
+                  <input type="hidden" name="NOTIFICATION_DRIVER" value="">
+                  <div class="zone-picker mt-1">
+                    <% driverOptions.forEach((option) => { %>
+                      <label class="checkbox">
+                        <input type="checkbox" name="NOTIFICATION_DRIVER" value="<%= option.key %>"
+                               <%= activeDrivers.includes(option.key) ? 'checked' : '' %>>
+                        <%= option.label %>
+                      </label>
+                    <% }) %>
+                  </div>
+                  <p class="field__hint">เลือกได้หลายช่องทางพร้อมกัน · ไม่เลือกเลยจะไม่ส่งจริง</p>
+                </div>
+                <hr class="rule">
+              <% } %>
+
+              <div class="settings-grid">
+                <% groupSettings.forEach((item) => { %>
+                  <div class="field field--<%= item.type %>">
+                    <label class="field__label" for="<%= item.key %>"><%= item.label %></label>
+
+                    <% if (item.type === 'select') { %>
+                      <select class="input" id="<%= item.key %>" name="<%= item.key %>">
+                        <% item.options.forEach((option) => { %>
+                          <option value="<%= option.value %>" <%= item.value === option.value ? 'selected' : '' %>>
+                            <%= option.label %>
+                          </option>
+                        <% }) %>
+                      </select>
+
+
+                    <% } else if (item.type === 'integer') { %>
+                      <input class="input" type="number" id="<%= item.key %>" name="<%= item.key %>"
+                             min="<%= item.min %>" max="<%= item.max %>" step="1"
+                             autocomplete="off" value="<%= item.value %>">
+
+                    <% } else { %>
+                      <input class="input <%= item.secret || item.type === 'cron' ? 'mono' : '' %>"
+                             type="<%= item.type === 'url' ? 'url' : 'text' %>"
+                             id="<%= item.key %>" name="<%= item.key %>" maxlength="500"
+                             autocomplete="off" spellcheck="false"
+                             value="<%= item.secret ? '' : item.value %>"
+                             placeholder="<%= item.secret
+                                 ? (item.configured ? 'ตั้งค่าไว้แล้ว ' + item.preview + ' — เว้นว่างไว้เพื่อใช้ค่าเดิม' : 'ยังไม่ได้ตั้งค่า')
+                                 : '' %>">
+                    <% } %>
+
+                    <p class="field__hint">
+                      <% if (item.source === 'database') { %>
+                        <span class="badge badge--primary">ตั้งจากหน้านี้</span>
+                      <% } else if (item.source === 'env') { %>
+                        <span class="badge badge--muted">จาก .env</span>
+                      <% } else if (item.source === 'default') { %>
+                        <span class="badge badge--muted">ค่าเริ่มต้น</span>
+                      <% } else { %>
+                        <span class="badge badge--muted">ยังไม่ได้ตั้ง</span>
+                      <% } %>
+                      <% if (item.hint) { %><%= item.hint %><% } %>
+                    </p>
+
+                    <% if (item.source === 'database') { %>
+                      <label class="checkbox small">
+                        <input type="checkbox" name="clearKeys" value="<%= item.key %>">
+                        ล้างค่านี้ (กลับไปใช้ค่าจาก .env)
+                      </label>
+                    <% } %>
+                  </div>
+                <% }) %>
+              </div>
+            </div>
+
+            <% if (canManage) { %>
+              <div class="card__footer card__footer--split">
+                <p class="small faint">
+                  <% if (tab === 'schedule') { %>
+                    รูปแบบ cron 5 ช่อง: <span class="mono">นาที ชั่วโมง วัน เดือน วันในสัปดาห์</span> · เวลาไทย
+                  <% } else if (groupSettings.some((item) => item.secret)) { %>
+                    🔒 ค่าลับถูกเก็บในฐานข้อมูลและไม่เคยส่งกลับมาแสดงอีก — เห็นได้แค่ 4 ตัวท้าย
+                  <% } else { %>
+                    บันทึกแล้วมีผลทันที ไม่ต้องรีสตาร์ตระบบ
+                  <% } %>
+                </p>
+                <div class="flex">
+                  <% if (tab === 'notification' || tab === 'detection' || tab === 'mail') { %>
+                    <button class="btn" type="button" id="testConnections">ทดสอบการเชื่อมต่อ</button>
+                  <% } %>
+                  <button class="btn btn--primary" type="submit">บันทึก<%= activeGroup.label %></button>
+                </div>
+              </div>
+            <% } %>
+          </fieldset>
+        </form>
+      </section>
+    <% } %>
+  </div>
+</main>
+
+<script>
+document.getElementById('testConnections')?.addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = 'กำลังทดสอบ…';
+
+  const show = (id, result) => {
+    const element = document.getElementById(id);
+    if (!element) return;
+    element.innerHTML =
+      `<span class="badge badge--${result.healthy ? 'success' : 'danger'}">` +
+      `${result.healthy ? '✓' : '✗'}</span> ${result.message}`;
+  };
+
+  try {
+    const result = await window.AppShell.api('/api/admin/connections/test');
+    show('detectionStatus', result.detection);
+    show('notificationStatus', result.notification);
+    show('mailStatus', result.mail);
+    // อยู่นอกแท็บสถานะจึงไม่มีที่ให้แสดงผล — สรุปเป็น toast แทน
+    if (!document.getElementById('detectionStatus')) {
+      const failed = Object.entries(result).filter(([, item]) => !item.healthy);
+      window.AppShell.toast(
+        failed.length
+          ? failed.map(([name, item]) => `${name}: ${item.message}`).join(' · ')
+          : 'เชื่อมต่อได้ครบทุกบริการ',
+        failed.length ? 'danger' : 'success',
+      );
+    }
+  } catch (error) {
+    window.AppShell.toast(error.message, 'danger');
+  } finally {
+    button.disabled = false;
+    button.textContent = original;
+  }
+});
+</script>
+
+<%- include('../partials/foot') %>

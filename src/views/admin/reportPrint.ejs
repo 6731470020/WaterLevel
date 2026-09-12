@@ -1,0 +1,333 @@
+<%
+/**
+ * เอกสารรายงานระดับน้ำสำหรับพิมพ์เป็น PDF ขนาด A4
+ *
+ * เป็นเอกสารเดี่ยว ไม่ใช้ partial head/foot ของหน้าผู้ดูแล เพราะต้องการ
+ * เปลือกที่ต่างกันสิ้นเชิง — ไม่มีเมนู ไม่มี app.js มีแต่สไตล์สำหรับกระดาษ
+ */
+
+/** ปีพุทธศักราชของวันที่พิมพ์ */
+const thaiYear = (date) => date.getFullYear() + 543;
+
+/** วันที่แบบไทยเต็มรูปแบบ เช่น "23 สิงหาคม 2569" */
+const THAI_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+  'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+const thaiFull = (value) => {
+  if (!value) return '—';
+  const date = value instanceof Date ? value : new Date(`${String(value).slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return '—';
+  return `${date.getDate()} ${THAI_MONTHS[date.getMonth()]} ${thaiYear(date)}`;
+};
+
+/** ตัวเลขระดับน้ำ 2 ตำแหน่ง — ค่าที่ยังคำนวณไม่ได้แสดงเป็นขีด ไม่ใช่ 0.00 */
+const meters = (value) => (value === null || value === undefined
+  ? '—'
+  : Number(value).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+
+/** เวลา HH:MM จากค่า HH:MM:SS */
+const clock = (value) => (value ? `${String(value).slice(0, 5)} น.` : '—');
+
+const rangeLabel = range.from || range.to
+  ? `${range.from ? thaiFull(range.from) : 'เริ่มต้น'} — ${range.to ? thaiFull(range.to) : 'ปัจจุบัน'}`
+  : 'ข้อมูลทั้งหมดที่มีในระบบ';
+
+const totalDays = groups.reduce((sum, group) => sum + group.summary.days, 0);
+const totalMeasurements = groups.reduce((sum, group) => sum + group.summary.measurements, 0);
+%><!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title><%= title %> · <%= rangeLabel %></title>
+  <link rel="stylesheet" href="/css/report-print.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <button type="button" class="is-primary" id="printNow">🖨 บันทึกเป็น PDF / พิมพ์</button>
+  <a href="/admin/reports">← กลับหน้ารายงาน</a>
+  <span class="toolbar__spacer"></span>
+  <span class="toolbar__hint">
+    เลือกขนาดกระดาษ A4 · ตั้งขอบเป็น “ค่าเริ่มต้น” · เปิด “กราฟิกพื้นหลัง” เพื่อให้สีออกครบ
+  </span>
+</div>
+
+<div class="sheet">
+
+  <header class="doc-head">
+    <div>
+      <div class="doc-head__mark">🌊</div>
+      <div class="doc-head__eyebrow">ระบบวัดระดับน้ำอัตโนมัติ</div>
+      <h1 class="doc-head__title">รายงานสรุประดับน้ำรายวัน</h1>
+      <p class="doc-head__range"><%= rangeLabel %></p>
+    </div>
+    <div class="doc-head__meta">
+      จุดวัด <strong><%= groups.length %></strong> แห่ง<br>
+      รวม <strong><%= totalDays.toLocaleString('th-TH') %></strong> วัน<br>
+      ค่าวัด <strong><%= totalMeasurements.toLocaleString('th-TH') %></strong> ครั้ง<br>
+      <span style="color:var(--line-strong)">──────────</span><br>
+      พิมพ์เมื่อ <%= thaiFull(printedAt) %><br>
+      <%= String(printedAt.getHours()).padStart(2, '0') %>:<%= String(printedAt.getMinutes()).padStart(2, '0') %> น.
+      · โดย <%= printedBy %>
+    </div>
+  </header>
+
+  <% if (truncated) { %>
+    <div class="notice">
+      <strong>เอกสารนี้แสดงข้อมูลไม่ครบ</strong> — ช่วงที่เลือกมีรายงานมากกว่าเพดานของเอกสารหนึ่งฉบับ
+      กรุณาแบ่งช่วงวันที่ให้แคบลงแล้วพิมพ์ทีละช่วง
+    </div>
+  <% } %>
+
+  <% if (!groups.length) { %>
+    <div class="empty">ไม่พบรายงานในช่วงที่เลือก</div>
+  <% } else { %>
+
+    <% if (groups.length > 1) { %>
+      <section class="overview">
+        <h2 class="overview__title">สรุปรวมทุกจุดวัด</h2>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>จุดวัด</th>
+              <th class="num">สูงสุดของช่วง</th>
+              <th class="num">ต่ำสุดของช่วง</th>
+              <th class="num">ส่วนต่างเฉลี่ย</th>
+              <th class="num">จำนวนวัน</th>
+              <th class="num">ค่าวัด</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% groups.forEach((group) => { %>
+              <tr>
+                <td><strong><%= group.station.name %></strong></td>
+                <td class="num peak"><%= meters(group.summary.peak && group.summary.peak.meter) %></td>
+                <td class="num trough"><%= meters(group.summary.trough && group.summary.trough.meter) %></td>
+                <td class="num"><%= meters(group.summary.avgRange) %></td>
+                <td class="num"><%= group.summary.days.toLocaleString('th-TH') %></td>
+                <td class="num"><%= group.summary.measurements.toLocaleString('th-TH') %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </section>
+      <section class="reading-note">
+        <h2 class="overview__title">วิธีอ่านรายงานฉบับนี้</h2>
+        <dl class="note-list">
+          <dt>หน่วยวัด</dt>
+          <dd>ระดับน้ำเป็น<strong>เมตร</strong>เทียบจากระดับอ้างอิงของจุดวัดแต่ละแห่ง จุดวัดต่างแห่งกันจึงเทียบตัวเลขกันตรง ๆ ไม่ได้</dd>
+
+          <dt>ระดับสูงสุด / ต่ำสุดของวัน</dt>
+          <dd>คำนวณจากค่าที่วัดได้ทุก 5 นาทีตลอดวัน (00:00–23:59 เวลาไทย) พร้อมเวลาที่เกิดค่านั้น</dd>
+
+          <dt>ส่วนต่าง</dt>
+          <dd>ระยะห่างระหว่างระดับสูงสุดกับต่ำสุดของวัน — ยิ่งมากแปลว่าน้ำขึ้นลงแรงในรอบวันนั้น</dd>
+
+          <dt>เครื่องหมาย “—”</dt>
+          <dd>แปลว่า<strong>ยังแปลงค่าเป็นเมตรไม่ได้</strong> เพราะจุดวัดนั้นมีจุดเทียบค่าไม่ครบ 2 จุด ไม่ได้แปลว่าระดับน้ำเป็นศูนย์</dd>
+
+          <dt>วันที่</dt>
+          <dd>แสดงเป็นพุทธศักราชทั้งฉบับ</dd>
+        </dl>
+      </section>
+    <% } %>
+
+    <% groups.forEach((group, index) => { %>
+      <%
+      const reports = group.reports;
+      // เตรียมข้อมูลกราฟ — ใช้เฉพาะวันที่มีทั้งค่าสูงสุดและต่ำสุด
+      const points = reports
+        .map((report, i) => ({
+          i,
+          date: report.reportDate,
+          high: report.highest.meter,
+          low: report.lowest.meter,
+          current: report.currentMeter,
+        }))
+        .filter((point) => point.high !== null && point.low !== null);
+
+      // ขนาดกราฟเป็นหน่วยผู้ใช้ของ SVG — ปรับตามความกว้างกระดาษด้วย viewBox
+      const W = 700;
+      const H = 190;
+      const PAD = { top: 14, right: 12, bottom: 26, left: 42 };
+      const plotW = W - PAD.left - PAD.right;
+      const plotH = H - PAD.top - PAD.bottom;
+
+      let scale = null;
+      if (points.length) {
+        const values = points.flatMap((point) => [point.high, point.low]);
+        let min = Math.min(...values);
+        let max = Math.max(...values);
+        // ช่วงแบนราบ (น้ำนิ่งทั้งสัปดาห์) จะทำให้ตัวหารเป็นศูนย์ — ถ่างออกให้เห็นเส้น
+        if (max - min < 0.05) { min -= 0.05; max += 0.05; }
+        const pad = (max - min) * 0.12;
+        min -= pad; max += pad;
+        const step = points.length > 1 ? plotW / points.length : plotW;
+        scale = {
+          min, max, step,
+          x: (i) => PAD.left + step * (i + 0.5),
+          y: (value) => PAD.top + plotH - ((value - min) / (max - min)) * plotH,
+          ticks: [min, min + (max - min) / 2, max],
+        };
+      }
+      // แท่งหนาเกินไปเมื่อมีไม่กี่วัน บางเกินไปเมื่อมีหลายสิบวัน
+      const barW = scale ? Math.max(2, Math.min(14, scale.step * 0.4)) : 0;
+      %>
+
+      <section class="station">
+        <div class="station__head">
+          <div>
+            <h2 class="station__name"><%= group.station.name %></h2>
+            <p class="station__meta">
+              รหัส <%= group.station.slug %>
+              <% if (group.station.description) { %> · <%= group.station.description %><% } %>
+              <% if (group.station.latitude && group.station.longitude) { %>
+                · พิกัด <%= Number(group.station.latitude).toFixed(5) %>, <%= Number(group.station.longitude).toFixed(5) %>
+              <% } %>
+            </p>
+          </div>
+          <span class="station__index">จุดวัดที่ <%= index + 1 %>/<%= groups.length %></span>
+        </div>
+
+        <div class="stats">
+          <div class="stat stat--peak">
+            <div class="stat__label">ระดับสูงสุดของช่วง</div>
+            <div class="stat__value"><%= meters(group.summary.peak && group.summary.peak.meter) %><span class="stat__unit"> ม.</span></div>
+            <div class="stat__note">
+              <% if (group.summary.peak) { %>
+                <%= group.summary.peak.thaiDate %> เวลา <%= clock(group.summary.peak.at) %>
+              <% } else { %>ยังไม่มีข้อมูล<% } %>
+            </div>
+          </div>
+          <div class="stat stat--trough">
+            <div class="stat__label">ระดับต่ำสุดของช่วง</div>
+            <div class="stat__value"><%= meters(group.summary.trough && group.summary.trough.meter) %><span class="stat__unit"> ม.</span></div>
+            <div class="stat__note">
+              <% if (group.summary.trough) { %>
+                <%= group.summary.trough.thaiDate %> เวลา <%= clock(group.summary.trough.at) %>
+              <% } else { %>ยังไม่มีข้อมูล<% } %>
+            </div>
+          </div>
+          <div class="stat stat--range">
+            <div class="stat__label">ส่วนต่างเฉลี่ยต่อวัน</div>
+            <div class="stat__value"><%= meters(group.summary.avgRange) %><span class="stat__unit"> ม.</span></div>
+            <div class="stat__note">ยิ่งมากยิ่งผันผวนในรอบวัน</div>
+          </div>
+          <div class="stat stat--days">
+            <div class="stat__label">ช่วงที่รายงาน</div>
+            <div class="stat__value"><%= group.summary.days.toLocaleString('th-TH') %><span class="stat__unit"> วัน</span></div>
+            <div class="stat__note">ค่าวัดรวม <%= group.summary.measurements.toLocaleString('th-TH') %> ครั้ง</div>
+          </div>
+        </div>
+
+        <% if (scale) { %>
+          <figure class="chart">
+            <svg class="chart__frame" viewBox="0 0 <%= W %> <%= H %>" role="img"
+                 aria-label="ช่วงระดับน้ำรายวันของ<%= group.station.name %>">
+              <%# เส้นระดับอ้างอิงและตัวเลขแกนซ้าย %>
+              <% scale.ticks.forEach((tick) => { %>
+                <line x1="<%= PAD.left %>" x2="<%= W - PAD.right %>"
+                      y1="<%= scale.y(tick).toFixed(1) %>" y2="<%= scale.y(tick).toFixed(1) %>"
+                      stroke="#e2e8f0" stroke-width="0.8"
+                      <%= tick === scale.ticks[1] ? 'stroke-dasharray="3 3"' : '' %>></line>
+                <text x="<%= PAD.left - 6 %>" y="<%= (scale.y(tick) + 3.5).toFixed(1) %>"
+                      text-anchor="end" font-size="10" fill="#94a3b8"><%= tick.toFixed(2) %></text>
+              <% }) %>
+
+              <%# แท่งช่วงระดับน้ำของแต่ละวัน: บน = สูงสุด · ล่าง = ต่ำสุด %>
+              <% points.forEach((point, i) => {
+                   const x = scale.x(i);
+                   const yHigh = scale.y(point.high);
+                   const yLow = scale.y(point.low);
+              %>
+                <rect x="<%= (x - barW / 2).toFixed(1) %>" y="<%= yHigh.toFixed(1) %>"
+                      width="<%= barW.toFixed(1) %>" height="<%= Math.max(1.5, yLow - yHigh).toFixed(1) %>"
+                      rx="<%= (barW / 2).toFixed(1) %>" fill="#a5f3fc"></rect>
+                <circle cx="<%= x.toFixed(1) %>" cy="<%= yHigh.toFixed(1) %>" r="2.6" fill="#0891b2"></circle>
+                <circle cx="<%= x.toFixed(1) %>" cy="<%= yLow.toFixed(1) %>" r="2.6" fill="#64748b"></circle>
+              <% }) %>
+
+              <%# ป้ายวันที่ — แสดงเท่าที่ไม่ทับกัน %>
+              <%
+              const labelEvery = Math.ceil(points.length / 12) || 1;
+              %>
+              <% points.forEach((point, i) => { %>
+                <% if (i % labelEvery === 0 || i === points.length - 1) { %>
+                  <text x="<%= scale.x(i).toFixed(1) %>" y="<%= H - 8 %>" text-anchor="middle"
+                        font-size="9.5" fill="#94a3b8"><%= point.date.slice(8, 10) %>/<%= point.date.slice(5, 7) %></text>
+                <% } %>
+              <% }) %>
+
+              <line x1="<%= PAD.left %>" x2="<%= W - PAD.right %>"
+                    y1="<%= PAD.top + plotH %>" y2="<%= PAD.top + plotH %>"
+                    stroke="#cbd5e1" stroke-width="1"></line>
+            </svg>
+            <figcaption class="chart__caption">
+              <span class="chart__key"><span class="chart__swatch" style="background:#0891b2"></span> ระดับสูงสุดของวัน</span>
+              <span class="chart__key"><span class="chart__swatch" style="background:#64748b"></span> ระดับต่ำสุดของวัน</span>
+              <span class="chart__key"><span class="chart__swatch" style="background:#a5f3fc"></span> ช่วงที่น้ำเคลื่อนไหว</span>
+            </figcaption>
+          </figure>
+        <% } %>
+
+        <table class="table">
+          <thead>
+            <tr>
+              <th>วันที่ (พ.ศ.)</th>
+              <th class="num">ระดับสูงสุด</th>
+              <th class="num">ระดับต่ำสุด</th>
+              <th class="num">ล่าสุดของวัน</th>
+              <th class="num">ส่วนต่าง</th>
+              <th class="num">จำนวนครั้ง</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% reports.forEach((report) => { %>
+              <tr>
+                <td><%= report.thaiDate %></td>
+                <td class="num">
+                  <span class="peak"><%= meters(report.highest.meter) %></span>
+                  <div class="time"><%= clock(report.highest.at) %></div>
+                </td>
+                <td class="num">
+                  <span class="trough"><%= meters(report.lowest.meter) %></span>
+                  <div class="time"><%= clock(report.lowest.at) %></div>
+                </td>
+                <td class="num"><%= meters(report.currentMeter) %></td>
+                <td class="num"><%= meters(report.rangeMeter) %></td>
+                <td class="num"><%= report.measurementCount.toLocaleString('th-TH') %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td>รวม / สูงสุด-ต่ำสุดของช่วง</td>
+              <td class="num peak"><%= meters(group.summary.peak && group.summary.peak.meter) %></td>
+              <td class="num trough"><%= meters(group.summary.trough && group.summary.trough.meter) %></td>
+              <td class="num muted">—</td>
+              <td class="num"><%= meters(group.summary.avgRange) %></td>
+              <td class="num"><%= group.summary.measurements.toLocaleString('th-TH') %></td>
+            </tr>
+          </tfoot>
+        </table>
+      </section>
+    <% }) %>
+  <% } %>
+
+  <footer class="doc-foot">
+    <span>ระบบวัดระดับน้ำอัตโนมัติ · หน่วยวัดเป็นเมตรจากระดับอ้างอิงของจุดวัดแต่ละแห่ง</span>
+    <span>ออกเอกสารโดย <%= printedBy %> · <%= thaiFull(printedAt) %></span>
+  </footer>
+</div>
+
+<script>
+  document.getElementById('printNow')?.addEventListener('click', () => window.print());
+  <% if (autoPrint) { %>
+    // เปิดจากปุ่ม "บันทึก PDF" ในหน้ารายงาน — เด้งกล่องพิมพ์ให้เลย
+    window.addEventListener('load', () => setTimeout(() => window.print(), 300));
+  <% } %>
+</script>
+
+</body>
+</html>

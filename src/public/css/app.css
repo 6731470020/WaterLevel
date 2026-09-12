@@ -1,0 +1,848 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   ระบบวัดระดับน้ำอัตโนมัติ — สไตล์ชีตหลัก
+   เขียนเป็น CSS ล้วน ไม่มีขั้นตอน build ตามข้อกำหนดของโปรเจกต์
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* สีพื้นฐาน */
+  --bg: #f1f5f9;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --border: #e2e8f0;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --text-faint: #94a3b8;
+
+  /* สีหลักของระบบ */
+  --primary: #0e7490;
+  --primary-dark: #155e75;
+  --primary-light: #ecfeff;
+
+  /* สีสถานะ */
+  --danger: #dc2626;
+  --danger-light: #fef2f2;
+  --warning: #d97706;
+  --warning-light: #fffbeb;
+  --success: #059669;
+  --success-light: #ecfdf5;
+
+  /* โซนเตือนภัย 6 ระดับ (ตรงกับ ZoneLevel) */
+  --zone-critical: #ef4444;
+  --zone-severe: #f97316;
+  --zone-danger: #eab308;
+  --zone-watch: #22c55e;
+  --zone-high: #06b6d4;
+  --zone-normal: #e5e7eb;
+
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow: 0 1px 3px rgb(15 23 42 / 8%), 0 1px 2px rgb(15 23 42 / 4%);
+  --shadow-lg: 0 10px 25px rgb(15 23 42 / 10%);
+  --font: 'IBM Plex Sans Thai', 'Sarabun', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mono: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+/*
+ * แอตทริบิวต์ `hidden` ต้องชนะกฎ display ของคลาสเสมอ
+ * ค่าปริยายของเบราว์เซอร์คือ `[hidden] { display: none }` ซึ่งมีลำดับความสำคัญ
+ * ต่ำกว่ากฎที่เขียนด้วยคลาส คลาสอย่าง `.camera__media { display: block }`
+ * จึงลบล้างมันได้ ทำให้อิลิเมนต์ที่สั่งซ่อนยังโผล่ออกมา (เคยทำให้ภาพแตก
+ * โผล่ใต้กล้องบนหน้าสาธารณะ) กันทั้งระบบไว้ที่นี่ทีเดียว
+ */
+[hidden] { display: none !important; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--bg);
+}
+
+h1, h2, h3, h4 { margin: 0 0 .5rem; line-height: 1.3; font-weight: 600; }
+h1 { font-size: 1.6rem; }
+h2 { font-size: 1.25rem; }
+h3 { font-size: 1.05rem; }
+p { margin: 0 0 .75rem; }
+a { color: var(--primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ─────────────────────────── โครงหน้า ─────────────────────────── */
+
+.container { max-width: 1280px; margin: 0 auto; padding: 0 1rem; }
+.container--narrow { max-width: 760px; }
+.page { padding: 1.5rem 0 3rem; }
+.page__header {
+  display: flex; flex-wrap: wrap; gap: 1rem;
+  align-items: center; justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+.page__title { margin: 0; }
+.page__subtitle { margin: .15rem 0 0; color: var(--text-muted); font-size: .9rem; }
+.page__actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+
+.grid { display: grid; gap: 1rem; }
+.grid--2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+.grid--3 { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.grid--4 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+
+
+/* ─────────────────────────── แถบนำทางผู้ดูแล ─────────────────────────── */
+
+.app-header { background: var(--surface); border-bottom: 1px solid var(--border); }
+.app-header__bar {
+  max-width: 1280px; margin: 0 auto; padding: .65rem 1rem;
+  display: flex; align-items: center; gap: 1rem;
+}
+.app-header__brand {
+  display: flex; align-items: center; gap: .5rem;
+  font-weight: 700; color: var(--text); text-decoration: none; white-space: nowrap;
+}
+.app-header__brand:hover { text-decoration: none; }
+.app-header__logo { font-size: 1.3rem; }
+.app-header__user {
+  margin-left: auto; display: flex; align-items: center; gap: .75rem;
+  font-size: .875rem; flex-wrap: wrap;
+}
+.app-header__name { font-weight: 600; }
+.app-header__link { color: var(--text-muted); }
+.app-header__logout { margin: 0; }
+.app-header__toggle {
+  display: none; background: none; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: .35rem .6rem; font-size: 1.1rem; cursor: pointer;
+}
+
+.app-nav {
+  max-width: 1280px; margin: 0 auto; padding: 0 1rem;
+  display: flex; gap: .25rem; overflow-x: auto;
+}
+.app-nav__item {
+  padding: .6rem .85rem; font-size: .9rem; color: var(--text-muted);
+  border-bottom: 2px solid transparent; white-space: nowrap;
+}
+.app-nav__item:hover { color: var(--text); text-decoration: none; }
+.app-nav__item.is-active {
+  color: var(--primary); border-bottom-color: var(--primary); font-weight: 600;
+}
+
+/* ─────────────────────────── แถบนำทางสาธารณะ ─────────────────────────── */
+
+.public-header {
+  background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+  color: #fff;
+}
+.public-header__inner {
+  max-width: 1280px; margin: 0 auto; padding: .9rem 1rem;
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+}
+.public-header__brand {
+  display: flex; align-items: center; gap: .5rem;
+  color: #fff; font-weight: 700; font-size: 1.05rem;
+}
+.public-header__brand:hover { text-decoration: none; }
+.public-header__nav { display: flex; align-items: center; gap: .75rem; }
+.public-header__nav a { color: #e0f2fe; font-size: .9rem; }
+.public-header__nav .btn--ghost { border-color: rgb(255 255 255 / 45%); color: #fff; }
+.public-header__nav .btn--primary { background: #fff; color: var(--primary-dark); border-color: #fff; }
+
+.public-footer { margin-top: 2.5rem; background: var(--surface); border-top: 1px solid var(--border); }
+.public-footer__inner { max-width: 1280px; margin: 0 auto; padding: 1.5rem 1rem 2.5rem; }
+.public-footer__meta { margin-top: 1rem; color: var(--text-faint); font-size: .8rem; text-align: center; }
+
+.pdpa-notice {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1rem 1.25rem;
+}
+.pdpa-notice__title { font-size: .95rem; margin-bottom: .5rem; }
+.pdpa-notice p { font-size: .85rem; color: var(--text-muted); margin-bottom: .5rem; }
+
+/* ─────────────────────────── การ์ด ─────────────────────────── */
+
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.card__header {
+  padding: .85rem 1.15rem; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+}
+.card__title { margin: 0; font-size: 1rem; font-weight: 600; }
+.card__body { padding: 1.15rem; }
+.card__footer {
+  padding: .75rem 1.15rem; border-top: 1px solid var(--border);
+  background: var(--surface-2); border-radius: 0 0 var(--radius) var(--radius);
+}
+
+/* การ์ดสถิติ */
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.15rem; }
+.stat__label { font-size: .8rem; color: var(--text-muted); margin-bottom: .25rem; }
+.stat__value { font-size: 1.75rem; font-weight: 700; line-height: 1.15; }
+.stat__hint { font-size: .78rem; color: var(--text-faint); margin-top: .2rem; }
+.stat--danger .stat__value { color: var(--danger); }
+.stat--warning .stat__value { color: var(--warning); }
+.stat--success .stat__value { color: var(--success); }
+
+/* การ์ดระดับน้ำหลักบนหน้าสาธารณะ */
+.level-card {
+  background: var(--surface); border-radius: var(--radius);
+  border-top: 6px solid var(--zone-color, var(--zone-normal));
+  box-shadow: var(--shadow-lg); padding: 1.5rem;
+}
+.level-card__value {
+  font-size: 3.25rem; font-weight: 700; line-height: 1;
+  color: var(--zone-color, var(--text)); font-variant-numeric: tabular-nums;
+}
+.level-card__unit { font-size: 1.25rem; font-weight: 500; color: var(--text-muted); }
+.level-card__meta { margin-top: .5rem; color: var(--text-muted); font-size: .875rem; }
+.level-card__stale { color: var(--warning); font-weight: 600; }
+/* ใช้แทนตัวเลข เมื่อยังแปลงค่าเป็นเมตรไม่ได้ — ไม่โชว์พิกเซลให้คนทั่วไป */
+.level-card__unavailable { font-size: 1.1rem; font-weight: 500; color: var(--text-muted); }
+
+/* ─────────────────────────── ป้ายและสถานะ ─────────────────────────── */
+
+.zone-badge {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .2rem .6rem; border-radius: 999px; font-size: .8rem; font-weight: 600;
+  background: color-mix(in srgb, var(--zone-color) 14%, white);
+  color: color-mix(in srgb, var(--zone-color) 72%, black);
+  border: 1px solid color-mix(in srgb, var(--zone-color) 32%, white);
+}
+.zone-badge__dot {
+  width: .55rem; height: .55rem; border-radius: 50%; background: var(--zone-color);
+}
+.zone-badge--unknown { background: var(--surface-2); color: var(--text-faint); border-color: var(--border); }
+
+.badge {
+  display: inline-block; padding: .15rem .55rem; border-radius: 999px;
+  font-size: .75rem; font-weight: 600; background: var(--surface-2);
+  color: var(--text-muted); border: 1px solid var(--border);
+}
+.badge--success { background: var(--success-light); color: var(--success); border-color: currentColor; }
+.badge--danger { background: var(--danger-light); color: var(--danger); border-color: currentColor; }
+.badge--warning { background: var(--warning-light); color: var(--warning); border-color: currentColor; }
+.badge--primary { background: var(--primary-light); color: var(--primary-dark); border-color: currentColor; }
+.badge--muted { background: var(--surface-2, #f1f5f9); color: var(--muted); }
+
+/* แถวที่แก้ไขไม่ได้ — ข้อมูลมีเจ้าของอยู่ที่อื่น */
+.table__row--locked { background: var(--surface-2, #f8fafc); }
+.table__row--locked td { color: var(--muted); }
+
+/* ─────────────────────────── ปุ่ม ─────────────────────────── */
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+  padding: .5rem .95rem; border-radius: var(--radius-sm); border: 1px solid transparent;
+  font-family: inherit; font-size: .875rem; font-weight: 600; line-height: 1.4;
+  cursor: pointer; text-decoration: none; transition: background .15s, border-color .15s;
+  background: var(--surface); color: var(--text); border-color: var(--border);
+}
+.btn:hover { text-decoration: none; background: var(--surface-2); }
+.btn:disabled { opacity: .55; cursor: not-allowed; }
+.btn--sm { padding: .3rem .65rem; font-size: .8rem; }
+.btn--primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+.btn--primary:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
+.btn--danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+.btn--danger:hover { background: #b91c1c; border-color: #b91c1c; }
+.btn--ghost { background: transparent; }
+.btn--block { width: 100%; }
+
+/* ─────────────────────────── ฟอร์ม ─────────────────────────── */
+
+.field { margin-bottom: 1rem; }
+.field__label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: .3rem; }
+.field__hint { font-size: .78rem; color: var(--text-muted); margin-top: .25rem; }
+.field__error { font-size: .8rem; color: var(--danger); margin-top: .25rem; }
+.field--inline { display: flex; align-items: center; gap: .5rem; }
+
+.input, .select, .textarea {
+  width: 100%; padding: .5rem .7rem; font-family: inherit; font-size: .9rem;
+  color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.input:focus, .select:focus, .textarea:focus {
+  outline: 2px solid color-mix(in srgb, var(--primary) 45%, white);
+  outline-offset: 1px; border-color: var(--primary);
+}
+.textarea { min-height: 5rem; resize: vertical; }
+.input--sm { padding: .3rem .5rem; font-size: .82rem; }
+
+.checkbox { display: inline-flex; align-items: center; gap: .45rem; font-size: .875rem; cursor: pointer; }
+.checkbox input { width: 1rem; height: 1rem; accent-color: var(--primary); }
+
+.filters {
+  display: flex; flex-wrap: wrap; gap: .75rem; align-items: flex-end;
+  padding: 1rem; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); margin-bottom: 1rem;
+}
+.filters .field { margin-bottom: 0; min-width: 150px; }
+
+/* ─────────────────────────── ตาราง ─────────────────────────── */
+
+.table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); }
+.table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+.table th, .table td { padding: .6rem .8rem; text-align: left; border-bottom: 1px solid var(--border); }
+.table th {
+  background: var(--surface-2); font-weight: 600; font-size: .8rem;
+  color: var(--text-muted); white-space: nowrap; position: sticky; top: 0;
+}
+.table tbody tr:last-child td { border-bottom: none; }
+.table tbody tr:hover { background: var(--surface-2); }
+.table__num { text-align: right; font-variant-numeric: tabular-nums; }
+.table__actions { white-space: nowrap; text-align: right; }
+.table__empty { padding: 2.5rem 1rem; text-align: center; color: var(--text-muted); }
+
+/* ─────────────────────────── การแจ้งเตือนบนหน้า ─────────────────────────── */
+
+.alert {
+  padding: .8rem 1rem; border-radius: var(--radius); margin-bottom: 1rem;
+  border: 1px solid; font-size: .875rem;
+}
+.alert--info { background: var(--primary-light); border-color: #a5f3fc; color: var(--primary-dark); }
+.alert--success { background: var(--success-light); border-color: #a7f3d0; color: #065f46; }
+.alert--warning { background: var(--warning-light); border-color: #fde68a; color: #92400e; }
+.alert--danger { background: var(--danger-light); border-color: #fecaca; color: #991b1b; }
+.alert ul { margin: .4rem 0 0; padding-left: 1.2rem; }
+
+/* ─────────────────────────── แบ่งหน้า ─────────────────────────── */
+
+.pagination {
+  display: flex; flex-wrap: wrap; gap: .75rem;
+  align-items: center; justify-content: space-between; margin-top: 1rem;
+}
+.pagination__info { font-size: .82rem; color: var(--text-muted); }
+.pagination__links { display: flex; flex-wrap: wrap; gap: .25rem; }
+.pagination__link {
+  padding: .3rem .6rem; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-size: .82rem; background: var(--surface); color: var(--text-muted);
+}
+.pagination__link:hover { text-decoration: none; background: var(--surface-2); }
+.pagination__link.is-active {
+  background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 600;
+}
+
+/* ─────────────────────────── แท็บ ─────────────────────────── */
+
+.tabs { display: flex; gap: .25rem; border-bottom: 1px solid var(--border); margin-bottom: 1.25rem; overflow-x: auto; }
+.tabs__item {
+  padding: .55rem .9rem; font-size: .875rem; color: var(--text-muted);
+  border-bottom: 2px solid transparent; white-space: nowrap;
+}
+.tabs__item:hover { text-decoration: none; color: var(--text); }
+.tabs__item.is-active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+
+/* ─────────────────────────── กราฟ ─────────────────────────── */
+
+.chart-wrap { position: relative; height: 320px; }
+.chart-wrap--sm { height: 200px; }
+
+/* ─────────────────────────── กล้องสดและ ROI ─────────────────────────── */
+
+.camera { position: relative; background: #000; border-radius: var(--radius); overflow: hidden; }
+.camera__media { display: block; width: 100%; height: auto; }
+.camera__overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.camera__status {
+  position: absolute; top: .6rem; left: .6rem; z-index: 2;
+  padding: .2rem .55rem; border-radius: 999px; font-size: .75rem; font-weight: 600;
+  background: rgb(0 0 0 / 65%); color: #fff;
+}
+.camera__placeholder {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 240px; color: #94a3b8; font-size: .9rem; text-align: center; padding: 1rem;
+}
+
+/* ─────────────────────────── แถบเตือนภัย 6 ระดับ ─────────────────────────── */
+
+.zone-scale { display: flex; flex-direction: column; gap: .35rem; }
+.zone-scale__row {
+  display: grid; grid-template-columns: .75rem 1fr auto; gap: .6rem;
+  align-items: center; padding: .4rem .6rem; border-radius: var(--radius-sm);
+  font-size: .85rem; border: 1px solid var(--border); background: var(--surface);
+}
+.zone-scale__row.is-current {
+  border-color: var(--zone-color); background: color-mix(in srgb, var(--zone-color) 10%, white);
+  font-weight: 600;
+}
+.zone-scale__swatch { width: .75rem; height: 1.6rem; border-radius: 3px; background: var(--zone-color); }
+.zone-scale__value { font-variant-numeric: tabular-nums; color: var(--text-muted); font-size: .8rem; }
+
+/* ─────────────────────────── แกลเลอรี ─────────────────────────── */
+
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .75rem; }
+.gallery__item {
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  overflow: hidden; background: var(--surface); cursor: pointer; text-align: left;
+  padding: 0; font: inherit; color: inherit;
+}
+.gallery__item img { display: block; width: 100%; aspect-ratio: 4/3; object-fit: cover; background: var(--surface-2); }
+.gallery__caption { padding: .4rem .55rem; font-size: .75rem; color: var(--text-muted); }
+
+.lightbox {
+  position: fixed; inset: 0; z-index: 100; display: none;
+  align-items: center; justify-content: center; padding: 1.5rem;
+  background: rgb(15 23 42 / 88%);
+}
+.lightbox[open], .lightbox.is-open { display: flex; }
+.lightbox__img { max-width: 100%; max-height: 82vh; border-radius: var(--radius); }
+.lightbox__caption { color: #e2e8f0; text-align: center; margin-top: .75rem; font-size: .875rem; }
+.lightbox__close {
+  position: absolute; top: 1rem; right: 1rem; background: none; border: none;
+  color: #fff; font-size: 2rem; line-height: 1; cursor: pointer;
+}
+
+/* ─────────────────────────── หน้าเข้าสู่ระบบ ─────────────────────────── */
+
+.auth-page {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  padding: 1.5rem; background: linear-gradient(135deg, #0e7490, #155e75);
+}
+.auth-card {
+  width: 100%; max-width: 420px; background: var(--surface);
+  border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: 2rem;
+}
+.auth-card__brand { text-align: center; margin-bottom: 1.5rem; }
+.auth-card__logo { font-size: 2.5rem; }
+.auth-card__title { margin: .5rem 0 .25rem; }
+.auth-card__subtitle { color: var(--text-muted); font-size: .875rem; margin: 0; }
+.auth-card__links { margin-top: 1rem; text-align: center; font-size: .85rem; }
+
+/* ─────────────────────────── หน้าใบอนุญาตหมดอายุ ─────────────────────────── */
+
+.license-page {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  padding: 1.5rem; background: linear-gradient(135deg, #7f1d1d, #991b1b);
+}
+.license-card {
+  width: 100%; max-width: 520px; background: var(--surface);
+  border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: 2.25rem; text-align: center;
+}
+.license-card__icon { font-size: 3rem; }
+.license-card__contact {
+  margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border);
+  text-align: left; font-size: .9rem;
+}
+.license-card__contact dt { font-weight: 600; color: var(--text-muted); font-size: .8rem; }
+.license-card__contact dd { margin: 0 0 .6rem; }
+
+/* ─────────────────────────── ตัวช่วยทั่วไป ─────────────────────────── */
+
+.muted { color: var(--text-muted); }
+.faint { color: var(--text-faint); }
+.small { font-size: .82rem; }
+.mono { font-family: var(--mono); font-size: .85em; }
+.nowrap { white-space: nowrap; }
+.text-right { text-align: right; }
+.text-center { text-align: center; }
+.mt-0 { margin-top: 0; } .mt-1 { margin-top: .5rem; } .mt-2 { margin-top: 1rem; } .mt-3 { margin-top: 1.5rem; }
+.mb-0 { margin-bottom: 0; } .mb-1 { margin-bottom: .5rem; } .mb-2 { margin-bottom: 1rem; } .mb-3 { margin-bottom: 1.5rem; }
+.flex { display: flex; gap: .5rem; }
+.flex--between { justify-content: space-between; }
+.flex--center { align-items: center; }
+.flex--wrap { flex-wrap: wrap; }
+.flex--col { flex-direction: column; }
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ─────────────────────────── หน้าจอเล็ก ─────────────────────────── */
+
+@media (max-width: 768px) {
+  .app-header__toggle { display: block; margin-left: auto; }
+  .app-header__user { width: 100%; order: 3; justify-content: flex-start; }
+  .app-nav { display: none; flex-direction: column; padding-bottom: .5rem; }
+  .app-nav.is-open { display: flex; }
+  .app-nav__item { border-bottom: none; border-left: 2px solid transparent; }
+  .app-nav__item.is-active { border-left-color: var(--primary); border-bottom-color: transparent; }
+  .level-card__value { font-size: 2.5rem; }
+  .page__header { flex-direction: column; align-items: flex-start; }
+}
+
+@media print {
+  .app-header, .public-header, .public-footer, .page__actions, .pagination, .filters { display: none; }
+  body { background: #fff; }
+  .card { box-shadow: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   หน้าสาธารณะของจุดวัด — โครง 2:1 พร้อมแถบหัวเรื่อง
+   วางตามแนวทางของระบบเดิม (data/bangpai.tspnextsoftware.com/index.php)
+   ที่ใช้ `lg:grid-cols-3` โดยกล้องกินสองส่วนและข้อมูลสรุปอยู่คอลัมน์ขวา
+   ═══════════════════════════════════════════════════════════════ */
+
+.station-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius);
+  padding: 1.1rem 1.25rem;
+  margin: 1rem 0 1.25rem;
+  color: #fff;
+  background: linear-gradient(120deg, #0e7490 0%, #0891b2 45%, #14b8a6 100%);
+  box-shadow: 0 10px 30px rgb(8 145 178 / 25%);
+}
+
+/* ดวงไฟเบลอสองดวงให้พื้นหลังไม่แบน — เป็นการตกแต่งล้วน จึงซ่อนจากโปรแกรมอ่านหน้าจอ */
+.station-hero::before,
+.station-hero::after {
+  content: '';
+  position: absolute;
+  width: 16rem; height: 16rem;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: .28;
+  pointer-events: none;
+}
+.station-hero::before { background: #fff; top: -6rem; right: -4rem; }
+.station-hero::after { background: #99f6e4; bottom: -8rem; left: -4rem; }
+
+.station-hero__inner {
+  position: relative;
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: .75rem 1.25rem;
+}
+.station-hero__mark {
+  display: grid; place-items: center;
+  width: 3rem; height: 3rem; flex: none;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 18%);
+  border: 1px solid rgb(255 255 255 / 30%);
+  font-size: 1.5rem;
+}
+.station-hero__text { min-width: 0; }
+.station-hero__title { margin: 0; font-size: 1.35rem; font-weight: 700; line-height: 1.25; }
+.station-hero__subtitle { margin: .15rem 0 0; font-size: .82rem; opacity: .92; }
+.station-hero__aside { margin-left: auto; display: flex; flex-wrap: wrap; gap: .4rem; }
+.station-hero__chip {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .25rem .6rem; border-radius: 999px;
+  background: rgb(255 255 255 / 18%);
+  border: 1px solid rgb(255 255 255 / 25%);
+  font-size: .75rem; white-space: nowrap;
+}
+
+/* โครงสองคอลัมน์ — กล้องและกราฟกินพื้นที่หลัก ข้อมูลสรุปอยู่ขวา */
+.station-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+.station-layout__main,
+.station-layout__side { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+
+@media (max-width: 1024px) {
+  .station-layout { grid-template-columns: 1fr; }
+  /* บนจอแคบ ระดับน้ำปัจจุบันต้องมาก่อนภาพกล้อง — คนเปิดดูเพื่อรู้ว่าน้ำสูงแค่ไหน */
+  .station-layout__side { order: 1; }
+  .station-layout__main { order: 2; }
+}
+
+/* จำกัดความสูงภาพกล้องไม่ให้ดันเนื้อหาอื่นตกจอ */
+.camera--capped .camera__media { max-height: 62vh; object-fit: contain; }
+
+/* แถบค่าที่วัดล่าสุดแบบเลื่อนแนวนอน */
+.reading-strip {
+  display: flex; gap: .5rem;
+  overflow-x: auto;
+  padding-bottom: .35rem;
+  scrollbar-width: thin;
+}
+.reading-strip__item {
+  flex: none; width: 5.5rem;
+  border: 1px solid var(--border); border-left: 3px solid var(--zone-color, var(--border));
+  border-radius: var(--radius-sm);
+  padding: .4rem .5rem;
+  background: var(--surface);
+}
+.reading-strip__time { font-size: .7rem; color: var(--text-muted); }
+.reading-strip__value {
+  font-size: 1rem; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--zone-color, var(--text));
+}
+.reading-strip__unit { font-size: .7rem; font-weight: 500; color: var(--text-muted); }
+
+/* ── แนวโน้มล่วงหน้า ── */
+.forecast__trend {
+  margin: 0; font-size: 1rem; font-weight: 700;
+  display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap;
+}
+.forecast__rate {
+  font-size: .8rem; font-weight: 500; color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   การ์ดจุดวัดบนหน้าแรก — ใช้ภาพล่าสุดเป็นพื้นหลัง
+   ภาพจากกล้องบอกสถานการณ์ได้เร็วกว่าตัวเลขเปล่า ๆ แต่ตัวเลขต้องอ่านออก
+   เสมอไม่ว่าภาพจะสว่างหรือมืด จึงมีชั้นไล่สีทึบคั่นไว้ใต้ข้อความทุกครั้ง
+   ═══════════════════════════════════════════════════════════════ */
+
+.tile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1rem;
+}
+
+.tile {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: var(--radius);
+  min-height: 15.5rem;
+  color: #fff;
+  text-decoration: none;
+  background: #0f172a;
+  box-shadow: 0 4px 16px rgb(15 23 42 / 12%);
+  transition: transform .18s ease, box-shadow .18s ease;
+  isolation: isolate;
+}
+.tile:hover,
+.tile:focus-visible {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 34px rgb(15 23 42 / 26%);
+}
+.tile:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+
+.tile__media {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  z-index: -2;
+  transition: transform .35s ease;
+}
+.tile:hover .tile__media { transform: scale(1.05); }
+
+/* ไม่มีภาพก็ยังต้องดูตั้งใจ — ไล่สีตามโซนแทนพื้นเทาเปล่า */
+.tile__media--empty {
+  position: absolute; inset: 0; z-index: -2;
+  background:
+    radial-gradient(120% 90% at 20% 0%, color-mix(in srgb, var(--zone-color) 55%, transparent), transparent 70%),
+    linear-gradient(160deg, #1e293b, #0f172a);
+}
+
+/* ชั้นไล่สีทึบ — รับประกันว่าตัวอักษรอ่านออกบนภาพทุกแบบ */
+.tile__scrim {
+  position: absolute; inset: 0; z-index: -1;
+  background: linear-gradient(180deg,
+    rgb(15 23 42 / 62%) 0%,
+    rgb(15 23 42 / 28%) 32%,
+    rgb(15 23 42 / 78%) 72%,
+    rgb(15 23 42 / 92%) 100%);
+}
+
+/* แถบสีโซนด้านบน — อ่านสถานะได้ก่อนอ่านตัวเลข */
+.tile__accent {
+  position: absolute; top: 0; left: 0; right: 0; height: 4px;
+  background: var(--zone-color, var(--zone-normal));
+}
+
+.tile__body {
+  position: relative;
+  display: flex; flex-direction: column; height: 100%;
+  min-height: 15.5rem;
+  padding: 1rem 1.1rem;
+  gap: .35rem;
+}
+.tile__name {
+  margin: 0; font-size: 1.05rem; font-weight: 700;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 55%);
+}
+.tile__spacer { flex: 1 1 auto; }
+.tile__value {
+  display: flex; align-items: baseline; gap: .3rem;
+  font-size: 2.75rem; font-weight: 800; line-height: 1;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 8px rgb(0 0 0 / 55%);
+}
+.tile__unit { font-size: 1rem; font-weight: 600; opacity: .85; }
+.tile__unavailable { font-size: 1.1rem; font-weight: 600; opacity: .85; }
+.tile__meta {
+  margin: 0; font-size: .78rem; opacity: .85;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 55%);
+}
+.tile__chips { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
+.tile__chip {
+  display: inline-flex; align-items: center; gap: .3rem;
+  padding: .2rem .55rem; border-radius: 999px;
+  font-size: .72rem; font-weight: 600;
+  background: rgb(255 255 255 / 16%);
+  border: 1px solid rgb(255 255 255 / 26%);
+  backdrop-filter: blur(4px);
+}
+.tile__chip--zone { background: var(--zone-color); color: var(--zone-text, #0f172a); border-color: transparent; }
+.tile__chip--warn { background: rgb(234 179 8 / 90%); color: #422006; border-color: transparent; }
+.tile__go { font-size: .78rem; font-weight: 600; opacity: .9; }
+
+/* ── แถบระดับเตือนภัยแบบกะทัดรัด ── */
+.zone-legend { display: flex; flex-wrap: wrap; gap: .4rem; }
+.zone-legend__item {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .3rem .6rem;
+  border: 1px solid var(--border); border-radius: 999px;
+  font-size: .8rem; background: var(--surface);
+}
+.zone-legend__dot {
+  width: .7rem; height: .7rem; border-radius: 50%;
+  background: var(--zone-color); flex: none;
+}
+.zone-legend__rank { color: var(--text-faint); font-size: .72rem; }
+
+@media (max-width: 480px) {
+  .tile, .tile__body { min-height: 13rem; }
+  .tile__value { font-size: 2.25rem; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ฟอร์มตั้งค่าแบบสองคอลัมน์
+   ฟอร์มยาว ๆ คอลัมน์เดียวทำให้ต้องเลื่อนจอตลอดเวลาและมองไม่เห็นภาพรวมว่า
+   เหลืออะไรต้องกรอกอีกบ้าง แยกเป็น "สิ่งที่ต้องกรอก" กับ "ค่าที่ตั้งไว้ให้แล้ว"
+   คนละคอลัมน์ ทำให้กรอกเฉพาะฝั่งซ้ายแล้วกดบันทึกได้เลย
+   ═══════════════════════════════════════════════════════════════ */
+
+.form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr);
+  gap: 1rem;
+  align-items: start;
+}
+.form-grid__col { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+
+@media (max-width: 1024px) {
+  .form-grid { grid-template-columns: 1fr; }
+}
+
+/* ป้ายบอกว่าการ์ดนี้มีค่าเริ่มต้นให้แล้ว ไม่ต้องแตะก็ได้ */
+.card__note {
+  font-size: .72rem; font-weight: 500; color: var(--text-muted);
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 999px; padding: .15rem .55rem; white-space: nowrap;
+}
+
+/* แถบปุ่มที่ตรึงไว้ท้ายจอ — กดบันทึกได้โดยไม่ต้องเลื่อนลงสุด */
+.form-actions {
+  position: sticky; bottom: 0; z-index: 5;
+  display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+  margin-top: 1rem;
+  padding: .85rem 1rem;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 -4px 18px rgb(15 23 42 / 8%);
+}
+.form-actions__hint { margin: 0; font-size: .78rem; color: var(--text-muted); }
+.form-actions__spacer { flex: 1 1 auto; }
+
+/* แถวฟิลด์ที่วางเคียงกันภายในการ์ด */
+.field-row {
+  display: grid; gap: .75rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+}
+.field-row--wide { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+@media (max-width: 560px) {
+  .field-row--wide { grid-template-columns: 1fr; }
+}
+
+/* กลุ่มติ๊กโซน — จัดเป็นกริดแทนการไหลยาว */
+.zone-picker {
+  display: grid; gap: .4rem;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+}
+.zone-picker .checkbox { margin: 0; }
+
+/* ── หน้าตั้งค่าระบบ ── */
+.settings-fieldset { border: none; padding: 0; margin: 0; min-width: 0; }
+.settings-fieldset[disabled] { opacity: .65; }
+.settings-grid {
+  display: grid; gap: .85rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+}
+
+/* ── หน้าตั้งค่าแบบแท็บ ── */
+
+/* คำอธิบายใต้หัวการ์ด — ต่างจาก `.card__note` ที่เป็นป้ายกลมสั้น ๆ ตรงที่ตัดบรรทัดได้ */
+.card__subtitle { margin: .2rem 0 0; font-size: .8rem; color: var(--text-muted); }
+
+/* ตัวเลขบอกว่าแท็บนี้มีค่าที่ตั้งจากหน้าเว็บไว้กี่ค่า */
+.tabs__count {
+  display: inline-block; min-width: 1.15rem; margin-left: .3rem; padding: 0 .3rem;
+  font-size: .68rem; font-weight: 600; line-height: 1.25rem; text-align: center;
+  color: var(--primary); background: color-mix(in srgb, var(--primary) 14%, transparent);
+  border-radius: 999px;
+}
+
+/* ท้ายการ์ดแบบสองฝั่ง: คำอธิบายซ้าย ปุ่มขวา */
+.card__footer--split {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; flex-wrap: wrap;
+}
+.card__footer--split > p { margin: 0; }
+
+/* เส้นคั่นภายในการ์ด */
+.rule { border: none; border-top: 1px solid var(--border); margin: 1.15rem 0; }
+
+/* ── ตารางติ๊กสิทธิ์ (matrix) ── */
+
+/* ตรึงหัวตารางไว้ตอนเลื่อน — ตารางสิทธิ์สูงเกินหนึ่งหน้าจอเสมอ
+   ถ้าหัวหายไป ผู้ใช้จะติ๊กผิดคอลัมน์โดยไม่รู้ตัว */
+.table-wrap--matrix { max-height: 34rem; overflow: auto; }
+
+.table--matrix { font-size: .82rem; }
+.table--matrix thead th {
+  position: sticky; top: 0; z-index: 3;
+  background: var(--surface-2); vertical-align: bottom;
+}
+.table--matrix th, .table--matrix td { padding: .45rem .6rem; }
+
+.matrix__corner {
+  position: sticky; left: 0; z-index: 4;
+  min-width: 15rem; text-align: left;
+}
+.matrix__role { text-align: center; min-width: 8.5rem; }
+.matrix__role-name { font-weight: 600; color: var(--text); }
+.matrix__role-key { font-size: .66rem; display: block; }
+.matrix__role-meta { font-size: .68rem; color: var(--text-muted); margin: .1rem 0 .35rem; }
+
+/* หัวข้อกลุ่มทรัพยากร — คั่นสายตาแทนการแยกเป็นการ์ดคนละใบ */
+.matrix__section th {
+  position: sticky; left: 0;
+  background: var(--surface-2); font-size: .72rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted);
+  padding-top: .7rem;
+}
+
+.matrix__label {
+  position: sticky; left: 0; z-index: 2;
+  background: var(--surface); text-align: left; font-weight: 400;
+  display: table-cell;
+}
+.matrix__label span { display: block; }
+.matrix__key { font-size: .66rem; }
+.table--matrix tbody tr:hover .matrix__label { background: var(--surface-2); }
+
+.matrix__cell { text-align: center; }
+.matrix__cell input[type="checkbox"] { width: 1rem; height: 1rem; accent-color: var(--primary); }
+.matrix__mark { color: var(--text-faint); }
+.matrix__mark.is-on { color: var(--success, #16a34a); font-weight: 700; }
+
+/* ── การ์ดที่พับเก็บได้ ── */
+.card--details > summary { cursor: pointer; list-style: none; }
+.card--details > summary::-webkit-details-marker { display: none; }
+.card--details:not([open]) > summary { border-bottom: none; }
+.card--details > summary:hover { background: var(--surface-2); }
+
+/* ── ตัวเลือกสิทธิ์ตอนสร้างบทบาทใหม่ ── */
+.perm-picker {
+  display: grid; gap: .9rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+}
+.perm-picker__group { border: none; padding: 0; margin: 0; min-width: 0; }
+.perm-picker__legend {
+  padding: 0; font-size: .72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--text-muted); margin-bottom: .3rem;
+}
+.perm-picker__group .checkbox { display: flex; margin-bottom: .2rem; }

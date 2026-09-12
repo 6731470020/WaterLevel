@@ -1,0 +1,36 @@
+<%
+/**
+ * แถบแบ่งหน้า — คงตัวกรองเดิมไว้ในลิงก์ทุกอัน
+ * ตัวแปร: pagination { page, pageSize, total, pages }, query (จาก res.locals)
+ */
+if (pagination.pages > 1) {
+  const buildUrl = (page) => {
+    const params = new URLSearchParams(query || {});
+    params.set('page', page);
+    return `${currentPath}?${params.toString()}`;
+  };
+  const window = 2;
+  const from = Math.max(1, pagination.page - window);
+  const to = Math.min(pagination.pages, pagination.page + window);
+%>
+<nav class="pagination" aria-label="แบ่งหน้า">
+  <span class="pagination__info">
+    ทั้งหมด <%= pagination.total.toLocaleString('th-TH') %> รายการ ·
+    หน้า <%= pagination.page %> จาก <%= pagination.pages %>
+  </span>
+  <div class="pagination__links">
+    <% if (pagination.page > 1) { %>
+      <a href="<%= buildUrl(1) %>" class="pagination__link">« หน้าแรก</a>
+      <a href="<%= buildUrl(pagination.page - 1) %>" class="pagination__link">ก่อนหน้า</a>
+    <% } %>
+    <% for (let p = from; p <= to; p += 1) { %>
+      <a href="<%= buildUrl(p) %>"
+         class="pagination__link <%= p === pagination.page ? 'is-active' : '' %>"><%= p %></a>
+    <% } %>
+    <% if (pagination.page < pagination.pages) { %>
+      <a href="<%= buildUrl(pagination.page + 1) %>" class="pagination__link">ถัดไป</a>
+      <a href="<%= buildUrl(pagination.pages) %>" class="pagination__link">หน้าสุดท้าย »</a>
+    <% } %>
+  </div>
+</nav>
+<% } %>

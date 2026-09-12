@@ -1,0 +1,19 @@
+<%
+/** แถบนำทางของหน้าสาธารณะ — แสดงลิงก์เข้าสู่ระบบหรือหน้าผู้ดูแลตามสถานะ */
+%>
+<header class="public-header">
+  <div class="public-header__inner">
+    <a class="public-header__brand" href="/">
+      <span aria-hidden="true">💧</span>
+      <span>ระบบตรวจวัดระดับน้ำอัตโนมัติ</span>
+    </a>
+    <nav class="public-header__nav" aria-label="เมนู">
+      <a href="/">หน้าแรก</a>
+      <% if (currentUser) { %>
+        <a href="/admin" class="btn btn--sm btn--primary">หน้าผู้ดูแล</a>
+      <% } else { %>
+        <a href="/login" class="btn btn--sm btn--ghost">เข้าสู่ระบบ</a>
+      <% } %>
+    </nav>
+  </div>
+</header>

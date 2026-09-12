@@ -1,0 +1,98 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   สไตล์เฉพาะหน้าตั้งค่าระบบครั้งแรก
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.setup-page {
+  min-height: 100vh;
+  padding: 0 0 4rem;
+  background: var(--bg);
+}
+
+/* แถบหัวเรื่องเต็มความกว้าง — สูงตามเนื้อหาเอง จึงไม่มีเส้นตัดกลางการ์ด
+   ไม่ว่าหน้าจอจะกว้างเท่าใดหรือข้อความจะขึ้นบรรทัดใหม่กี่บรรทัด */
+.setup-hero {
+  background: linear-gradient(180deg, #0e7490, #155e75);
+  padding: 2.5rem 1rem 2rem;
+  text-align: center;
+  color: #fff;
+}
+.setup-hero h1 { color: #fff; margin-bottom: .35rem; }
+.setup-hero p { color: #cffafe; margin: 0; }
+.setup-hero__logo { font-size: 3rem; line-height: 1; margin-bottom: .25rem; }
+.setup-hero__status { font-size: .85rem; color: #a5f3fc; }
+
+.setup { max-width: 880px; margin: 0 auto; padding: 1.5rem 1rem 0; }
+.setup--narrow { max-width: 640px; }
+
+.setup__step {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+.setup__step-title {
+  display: flex; align-items: center; gap: .6rem;
+  font-size: 1.1rem; margin-bottom: 1rem;
+}
+.setup__step-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.85rem; height: 1.85rem; flex-shrink: 0;
+  border-radius: 50%; background: var(--primary); color: #fff;
+  font-size: .95rem; font-weight: 700;
+}
+
+/* ── ตัวเลือกฐานข้อมูล ── */
+.db-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
+
+.db-option {
+  display: block; cursor: pointer; position: relative;
+  border: 2px solid var(--border); border-radius: var(--radius);
+  padding: 1.1rem; transition: border-color .15s, background .15s;
+}
+.db-option:hover { border-color: color-mix(in srgb, var(--primary) 45%, var(--border)); }
+.db-option.is-selected { border-color: var(--primary); background: var(--primary-light); }
+.db-option input { position: absolute; top: 1.1rem; right: 1.1rem; accent-color: var(--primary); }
+
+.db-option__name { font-size: 1rem; margin-bottom: .25rem; padding-right: 1.5rem; }
+.db-option__summary { font-size: .85rem; color: var(--text-muted); margin-bottom: .75rem; }
+.db-option__list { margin: 0 0 .4rem; padding-left: 1.1rem; font-size: .8rem; }
+.db-option__list li { margin-bottom: .15rem; }
+.db-option__list--pros li { color: var(--success); }
+.db-option__list--pros li::marker { content: '✓  '; }
+.db-option__list--cons { color: var(--text-muted); }
+.db-option__list--cons li::marker { content: '·  '; }
+
+.setup__panel { margin-bottom: 1rem; }
+.setup__sql {
+  background: #0f172a; color: #e2e8f0; padding: .75rem;
+  border-radius: var(--radius-sm); font-size: .75rem;
+  overflow-x: auto; margin: .5rem 0 0; white-space: pre;
+}
+
+.setup__actions { margin-top: 1.5rem; }
+
+/* ── หน้าติดตั้งเสร็จ ── */
+.setup__steps-done {
+  list-style: none; margin: 0; padding: 0;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
+}
+.setup__step-done {
+  display: flex; gap: .75rem; align-items: flex-start;
+  padding: .85rem 1.1rem; border-bottom: 1px solid var(--border);
+}
+.setup__step-done:last-child { border-bottom: none; }
+.setup__check {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.5rem; height: 1.5rem; flex-shrink: 0;
+  border-radius: 50%; background: var(--success-light);
+  color: var(--success); font-weight: 700; font-size: .85rem;
+}
+
+@media (max-width: 640px) {
+  .setup-hero { padding: 2rem 1rem 1.5rem; }
+  .setup-hero__logo { font-size: 2.5rem; }
+  .db-options { grid-template-columns: 1fr; }
+}

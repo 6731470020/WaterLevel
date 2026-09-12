@@ -1,0 +1,156 @@
+<%- include('../partials/head', { bodyClass: 'setup-page', pageStyles: ['/css/setup.css'] }) %>
+
+<header class="setup-hero">
+  <div class="setup-hero__logo" aria-hidden="true">💧</div>
+  <h1>ตั้งค่าระบบวัดระดับน้ำอัตโนมัติ</h1>
+  <p>ยินดีต้อนรับ — ขั้นตอนนี้ทำครั้งเดียวเมื่อติดตั้งระบบใหม่</p>
+  <p class="setup-hero__status">สถานะปัจจุบัน: <%= status.reason %></p>
+</header>
+
+<main class="setup">
+
+  <% if (error) { %>
+    <div class="alert alert--danger">
+      <strong><%= error %></strong>
+      <% if (details && details.length) { %>
+        <ul><% details.forEach((item) => { %><li><%= item.message || JSON.stringify(item) %></li><% }) %></ul>
+      <% } %>
+    </div>
+  <% } %>
+
+  <form method="post" action="/setup/install" id="setupForm">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+    <!-- ═══ ขั้นที่ 1: เลือกชนิดฐานข้อมูล ═══ -->
+    <section class="setup__step">
+      <h2 class="setup__step-title"><span class="setup__step-num">1</span> เลือกชนิดฐานข้อมูล</h2>
+
+      <div class="db-options">
+        <% options.forEach((option) => { %>
+          <label class="db-option <%= form.driver === option.key ? 'is-selected' : '' %>">
+            <input type="radio" name="driver" value="<%= option.key %>"
+                   <%= form.driver === option.key ? 'checked' : '' %> data-driver-radio>
+            <div class="db-option__body">
+              <h3 class="db-option__name"><%= option.name %></h3>
+              <p class="db-option__summary"><%= option.summary %></p>
+              <ul class="db-option__list db-option__list--pros">
+                <% option.pros.forEach((item) => { %><li><%= item %></li><% }) %>
+              </ul>
+              <ul class="db-option__list db-option__list--cons">
+                <% option.cons.forEach((item) => { %><li><%= item %></li><% }) %>
+              </ul>
+            </div>
+          </label>
+        <% }) %>
+      </div>
+    </section>
+
+    <!-- ═══ ขั้นที่ 2: รายละเอียดการเชื่อมต่อ ═══ -->
+    <section class="setup__step">
+      <h2 class="setup__step-title"><span class="setup__step-num">2</span> รายละเอียดการเชื่อมต่อ</h2>
+
+      <div class="setup__panel" data-driver-panel="sqlite">
+        <div class="field">
+          <label class="field__label" for="file">พาธไฟล์ฐานข้อมูล</label>
+          <input class="input mono" type="text" id="file" name="file" value="<%= form.file %>"
+                 maxlength="500" placeholder="./storage/waterlevel.db">
+          <p class="field__hint">
+            พาธสัมพัทธ์จากโฟลเดอร์โปรเจกต์ · ระบบจะสร้างไฟล์และโฟลเดอร์ให้อัตโนมัติ
+            <br>สำรองข้อมูลได้ด้วยการคัดลอกไฟล์นี้ไฟล์เดียว
+          </p>
+        </div>
+      </div>
+
+      <div class="setup__panel" data-driver-panel="mysql" hidden>
+        <div class="alert alert--info">
+          ต้องสร้างฐานข้อมูลและผู้ใช้ในเซิร์ฟเวอร์ MySQL ก่อน โดยรันคำสั่งนี้ใน MySQL client:
+          <pre class="mono setup__sql">CREATE DATABASE waterlevel CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'waterlevel'@'localhost' IDENTIFIED BY 'รหัสผ่านของคุณ';
+GRANT ALL PRIVILEGES ON waterlevel.* TO 'waterlevel'@'localhost';</pre>
+        </div>
+        <div class="grid grid--2">
+          <div class="field">
+            <label class="field__label" for="host">โฮสต์</label>
+            <input class="input" type="text" id="host" name="host" value="<%= form.host %>" maxlength="255">
+          </div>
+          <div class="field">
+            <label class="field__label" for="port">พอร์ต</label>
+            <input class="input" type="number" id="port" name="port" value="<%= form.port %>" min="1" max="65535">
+          </div>
+          <div class="field">
+            <label class="field__label" for="user">ชื่อผู้ใช้ฐานข้อมูล</label>
+            <input class="input" type="text" id="user" name="user" value="<%= form.user %>"
+                   maxlength="100" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="field__label" for="password">รหัสผ่านฐานข้อมูล</label>
+            <input class="input" type="password" id="password" name="password" autocomplete="off">
+          </div>
+        </div>
+        <div class="field">
+          <label class="field__label" for="database">ชื่อฐานข้อมูล</label>
+          <input class="input" type="text" id="database" name="database" value="<%= form.database %>" maxlength="100">
+        </div>
+      </div>
+
+      <div class="flex flex--center flex--wrap">
+        <button class="btn" type="button" id="testConnection">ทดสอบการเชื่อมต่อ</button>
+        <span id="testResult" class="small"></span>
+      </div>
+    </section>
+
+    <!-- ═══ ขั้นที่ 3: ผู้ดูแลคนแรก ═══ -->
+    <section class="setup__step">
+      <h2 class="setup__step-title"><span class="setup__step-num">3</span> สร้างผู้ดูแลสูงสุดคนแรก</h2>
+      <p class="field__hint mb-2">
+        บัญชีนี้จะได้สิทธิ์ทุกอย่างในระบบ รวมถึงการจัดการบทบาทและใบอนุญาต
+      </p>
+
+      <div class="grid grid--2">
+        <div class="field">
+          <label class="field__label" for="adminUsername">ชื่อผู้ใช้ *</label>
+          <input class="input mono" type="text" id="adminUsername" name="adminUsername"
+                 value="<%= form.adminUsername %>" required minlength="3" maxlength="100" autocomplete="off">
+        </div>
+        <div class="field">
+          <label class="field__label" for="adminEmail">อีเมล *</label>
+          <input class="input" type="email" id="adminEmail" name="adminEmail"
+                 value="<%= form.adminEmail %>" required autocomplete="off">
+        </div>
+      </div>
+      <div class="field">
+        <label class="field__label" for="adminFullName">ชื่อ-นามสกุล *</label>
+        <input class="input" type="text" id="adminFullName" name="adminFullName"
+               value="<%= form.adminFullName %>" required maxlength="200">
+      </div>
+      <div class="grid grid--2">
+        <div class="field">
+          <label class="field__label" for="adminPassword">รหัสผ่าน *</label>
+          <input class="input" type="password" id="adminPassword" name="adminPassword"
+                 required minlength="10" autocomplete="new-password">
+          <p class="field__hint">
+            อย่างน้อย 10 ตัวอักษร มีตัวพิมพ์ใหญ่ พิมพ์เล็ก และตัวเลข
+          </p>
+        </div>
+        <div class="field">
+          <label class="field__label" for="adminPasswordConfirm">ยืนยันรหัสผ่าน *</label>
+          <input class="input" type="password" id="adminPasswordConfirm" name="adminPasswordConfirm"
+                 required minlength="10" autocomplete="new-password">
+        </div>
+      </div>
+    </section>
+
+    <div class="setup__actions">
+      <button class="btn btn--primary btn--block" type="submit" id="installBtn">
+        ติดตั้งระบบและเริ่มใช้งาน
+      </button>
+      <p class="field__hint text-center mt-1">
+        ระบบจะบันทึกค่าลงไฟล์ <span class="mono">.env</span> สร้างตาราง
+        ใส่ข้อมูลตั้งต้น และสร้างบัญชีผู้ดูแลให้ในขั้นตอนเดียว
+      </p>
+    </div>
+  </form>
+</main>
+
+<script src="/js/SetupWizard.js" defer></script>
+<%- include('../partials/foot') %>

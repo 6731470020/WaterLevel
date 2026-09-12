@@ -1,0 +1,277 @@
+<%- include('../partials/head') %>
+<%- include('../partials/adminNav') %>
+
+<main class="page">
+  <div class="container">
+    <div class="page__header">
+      <div>
+        <h1 class="page__title"><%= station ? 'แก้ไขจุดวัด' : 'สร้างจุดวัดใหม่' %></h1>
+        <p class="page__subtitle">
+          หลังบันทึกแล้วอย่าลืมวาด ROI และใส่จุดเทียบค่าอย่างน้อย 2 จุด
+        </p>
+      </div>
+    </div>
+
+    <form method="post" action="<%= station ? `/admin/stations/${station.id}` : '/admin/stations' %>">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+      <div class="form-grid">
+        <%# คอลัมน์ซ้าย = สิ่งที่ต้องกรอกเอง · ขวา = ค่าที่ระบบตั้งไว้ให้แล้ว %>
+        <div class="form-grid__col">
+
+      <div class="card">
+        <div class="card__header"><h2 class="card__title">ข้อมูลทั่วไป</h2></div>
+        <div class="card__body">
+          <div class="field-row field-row--wide">
+          <div class="field">
+            <label class="field__label" for="name">ชื่อจุดวัด *</label>
+            <input class="input" type="text" id="name" name="name" required maxlength="255"
+                   value="<%= station ? station.name : '' %>">
+          </div>
+          <div class="field">
+            <label class="field__label" for="slug">ชื่อย่อสำหรับ URL</label>
+            <input class="input mono" type="text" id="slug" name="slug" maxlength="100"
+                   pattern="[a-z0-9-]{2,100}"
+                   value="<%= station ? station.slug : '' %>"
+                   placeholder="เว้นว่างไว้เพื่อให้ระบบสร้างให้อัตโนมัติ">
+            <p class="field__hint">เว้นว่างได้ ระบบสร้างให้เอง</p>
+          </div>
+          </div>
+          <div class="field">
+            <label class="field__label" for="description">คำอธิบาย</label>
+            <textarea class="textarea" id="description" name="description"
+                      maxlength="2000"><%= station ? (station.description || '') : '' %></textarea>
+          </div>
+          <label class="checkbox">
+            <input type="checkbox" name="isActive" value="1"
+                   <%= !station || station.isActive ? 'checked' : '' %>>
+            เปิดใช้งานจุดวัดนี้ (ระบบจะตรวจวัดอัตโนมัติทุก 5 นาที)
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__header"><h2 class="card__title">กล้องและภาพ</h2></div>
+        <div class="card__body">
+          <div class="field">
+            <label class="field__label" for="cameraType">ชนิดกล้อง</label>
+            <select class="select" id="cameraType" name="cameraType">
+              <% ['m3u8', 'snapshot', 'mjpeg'].forEach((type) => { %>
+                <option value="<%= type %>"
+                        <%= station && station.cameraType === type ? 'selected' : '' %>>
+                  <%= type === 'm3u8' ? 'สตรีม HLS (.m3u8)'
+                      : type === 'snapshot' ? 'ภาพนิ่ง (snapshot)' : 'สตรีม MJPEG' %>
+                </option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field__label" for="cameraUrl">URL กล้อง</label>
+            <input class="input mono" type="url" id="cameraUrl" name="cameraUrl" maxlength="500"
+                   value="<%= station ? (station.cameraUrl || '') : '' %>"
+                   placeholder="https://example.com/hls/cam1/index.m3u8">
+            <p class="field__hint">
+              ต้องเป็น http หรือ https และไม่ชี้ไปยังเครือข่ายภายใน (ป้องกัน SSRF)
+            </p>
+
+          <div class="field-row">
+            <div class="field">
+              <label class="field__label" for="cameraUsername">ชื่อผู้ใช้ของกล้อง</label>
+              <input class="input" type="text" id="cameraUsername" name="cameraUsername"
+                     maxlength="100" autocomplete="off"
+                     value="<%= station ? (station.cameraUsername || '') : '' %>">
+              <p class="field__hint">เว้นว่างถ้ากล้องไม่ต้องยืนยันตัวตน</p>
+            </div>
+            <div class="field">
+              <label class="field__label" for="cameraPassword">รหัสผ่านของกล้อง</label>
+              <input class="input" type="password" id="cameraPassword" name="cameraPassword"
+                     maxlength="255" autocomplete="new-password"
+                     placeholder="<%= station && station.cameraHasPassword
+                         ? 'ตั้งค่าไว้แล้ว — เว้นว่างไว้เพื่อใช้ค่าเดิม' : '' %>">
+              <%# ห้ามใส่รหัสผ่านลงใน URL กล้อง เพราะ URL ถูกพิมพ์ลงหน้าสาธารณะ %>
+              <p class="field__hint">🔒 เก็บที่เซิร์ฟเวอร์เท่านั้น ไม่เคยถูกส่งกลับมาแสดง</p>
+            </div>
+          </div>
+
+          <label class="checkbox mt-1">
+            <input type="checkbox" name="publicLiveEnabled" value="1"
+                   <%= station && station.publicLiveEnabled ? 'checked' : '' %>>
+            แสดงภาพสดบนหน้าสาธารณะ
+          </label>
+          <p class="field__hint">
+            ⚠️ <strong>ภาพสดไม่ผ่านการปกปิดใบหน้า</strong> — การเบลอเกิดตอนตรวจวัดเท่านั้น
+            เปิดเฉพาะกล้องที่หันไปทางแหล่งน้ำและไม่มีคนสัญจรผ่านหน้ากล้อง
+          </p>
+
+          <% if (station) { %>
+            <div class="field">
+              <button class="btn btn--sm" type="button" id="testCamera">ทดสอบการเชื่อมต่อกล้อง</button>
+              <span id="testCameraResult" class="small"></span>
+            </div>
+          <% } %>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label class="field__label" for="imageWidth">ความกว้างภาพต้นทาง (พิกเซล)</label>
+              <input class="input" type="number" id="imageWidth" name="imageWidth"
+                     min="1" max="8192" value="<%= station ? station.imageWidth : 704 %>">
+            </div>
+            <div class="field">
+              <label class="field__label" for="imageHeight">ความสูงภาพต้นทาง (พิกเซล)</label>
+              <input class="input" type="number" id="imageHeight" name="imageHeight"
+                     min="1" max="8192" value="<%= station ? station.imageHeight : 576 %>">
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label class="field__label" for="latitude">ละติจูด</label>
+              <input class="input" type="number" step="any" id="latitude" name="latitude"
+                     min="-90" max="90" value="<%= station && station.latitude !== null ? station.latitude : '' %>">
+            </div>
+            <div class="field">
+              <label class="field__label" for="longitude">ลองจิจูด</label>
+              <input class="input" type="number" step="any" id="longitude" name="longitude"
+                     min="-180" max="180" value="<%= station && station.longitude !== null ? station.longitude : '' %>">
+            </div>
+          </div>
+        </div>
+      </div>
+
+        </div>
+
+        <div class="form-grid__col">
+
+      <div class="card">
+        <div class="card__header">
+          <h2 class="card__title">การแจ้งเตือน</h2>
+          <span class="card__note">ตั้งค่าไว้ให้แล้ว</span>
+        </div>
+        <div class="card__body">
+          <div class="field">
+            <span class="field__label">แจ้งเตือนเข้ากลุ่ม LINE เมื่ออยู่ในโซน</span>
+            <div class="zone-picker mt-1">
+              <% zoneLevels.forEach((zone) => { %>
+                <label class="checkbox">
+                  <input type="checkbox" name="alertZoneKeys" value="<%= zone.key %>"
+                         <%= station
+                             ? (station.alertZoneKeys.includes(zone.key) ? 'checked' : '')
+                             : (zone.severity <= 2 ? 'checked' : '') %>>
+                  <span class="zone-badge" style="--zone-color: <%= zone.color %>">
+                    <span class="zone-badge__dot"></span><%= zone.label %>
+                  </span>
+                </label>
+              <% }) %>
+            </div>
+            <p class="field__hint">
+              ระบบเดิมฮาร์ดโค้ดไว้เฉพาะ "วิกฤต" และ "วิกฤตมาก" — ระบบใหม่ตั้งค่าได้รายจุดวัด
+            </p>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label class="field__label" for="alertCooldownMinutes">ระยะกันแจ้งเตือนซ้ำ (นาที)</label>
+              <input class="input" type="number" id="alertCooldownMinutes" name="alertCooldownMinutes"
+                     min="0" max="1440" value="<%= station ? station.alertCooldownMinutes : 60 %>">
+              <p class="field__hint">ยกเว้นเมื่อโซนแย่ลง ระบบจะแจ้งทันทีไม่รอ</p>
+            </div>
+            <div class="field">
+              <label class="field__label" for="lineGroupId">กลุ่ม LINE ปลายทาง</label>
+              <select class="select" id="lineGroupId" name="lineGroupId">
+                <option value="">ใช้ค่าเริ่มต้นของระบบ</option>
+                <% lineGroups.forEach((group) => { %>
+                  <option value="<%= group.groupId %>"
+                          <%= station && station.lineGroupId === group.groupId ? 'selected' : '' %>>
+                    <%= group.label %>
+                  </option>
+                <% }) %>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__header">
+          <h2 class="card__title">ความเป็นส่วนตัว (PDPA)</h2>
+          <span class="card__note">ตั้งค่าไว้ให้แล้ว</span>
+        </div>
+        <div class="card__body">
+          <label class="checkbox mb-2">
+            <input type="checkbox" name="pdpaEnabled" value="1"
+                   <%= !station || station.pdpa.enabled ? 'checked' : '' %>>
+            เปิดการปกปิดใบหน้าอัตโนมัติ (แนะนำให้เปิดเสมอ)
+          </label>
+          <div class="field-row">
+            <div class="field">
+              <label class="field__label" for="pdpaMethod">วิธีปกปิด</label>
+              <select class="select" id="pdpaMethod" name="pdpaMethod">
+                <option value="blur" <%= !station || station.pdpa.method === 'blur' ? 'selected' : '' %>>เบลอ</option>
+                <option value="pixelate" <%= station && station.pdpa.method === 'pixelate' ? 'selected' : '' %>>โมเสก</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field__label" for="pdpaBlurStrength">ความแรง</label>
+              <input class="input" type="number" id="pdpaBlurStrength" name="pdpaBlurStrength"
+                     min="1" max="100" value="<%= station ? station.pdpa.blur_strength : 30 %>">
+            </div>
+            <div class="field">
+              <label class="field__label" for="pdpaConfThreshold">ค่าความเชื่อมั่นขั้นต่ำ</label>
+              <input class="input" type="number" step="0.05" id="pdpaConfThreshold" name="pdpaConfThreshold"
+                     min="0" max="1" value="<%= station ? station.pdpa.conf_threshold : 0.3 %>">
+            </div>
+          </div>
+          <div class="field">
+            <label class="field__label" for="imageRetentionDays">เก็บภาพไว้กี่วันก่อนลบอัตโนมัติ</label>
+            <input class="input" type="number" id="imageRetentionDays" name="imageRetentionDays"
+                   min="1" max="3650" value="<%= station ? station.imageRetentionDays : 90 %>">
+          </div>
+        </div>
+      </div>
+
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn btn--primary" type="submit">
+          <%= station ? 'บันทึกการเปลี่ยนแปลง' : 'สร้างจุดวัด' %>
+        </button>
+        <a class="btn" href="/admin/stations">ยกเลิก</a>
+        <span class="form-actions__spacer"></span>
+        <p class="form-actions__hint">
+          กรอกเฉพาะคอลัมน์ซ้ายก็บันทึกได้ · ค่าอื่นแก้ภายหลังได้ทุกเมื่อ
+        </p>
+      </div>
+    </form>
+  </div>
+</main>
+
+<% if (station) { %>
+<script>
+/* ทดสอบการเชื่อมต่อกล้องผ่านเซิร์ฟเวอร์ — เบราว์เซอร์ต่อกล้องเองไม่ได้
+   เพราะติดทั้ง Digest auth, mixed content และ CORS */
+document.getElementById('testCamera')?.addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  const output = document.getElementById('testCameraResult');
+  button.disabled = true;
+  output.textContent = 'กำลังทดสอบ…';
+  output.className = 'small muted';
+  try {
+    const result = await window.AppShell.api('/api/admin/stations/<%= station.id %>/camera/test');
+    output.textContent = result.message;
+    output.className = result.ok ? 'small' : 'small';
+    output.style.color = result.ok ? 'var(--success)' : 'var(--danger)';
+    if (result.ok && result.width) {
+      document.getElementById('imageWidth').value = result.width;
+      document.getElementById('imageHeight').value = result.height;
+      window.AppShell.toast(`ตั้งขนาดภาพเป็น ${result.width}×${result.height} ให้แล้ว — กดบันทึกเพื่อยืนยัน`, 'success');
+    }
+  } catch (error) {
+    output.textContent = error.message;
+    output.style.color = 'var(--danger)';
+  } finally {
+    button.disabled = false;
+  }
+});
+</script>
+<% } %>
+
+<%- include('../partials/foot') %>

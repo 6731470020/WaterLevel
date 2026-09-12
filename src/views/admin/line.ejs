@@ -1,0 +1,111 @@
+<%- include('../partials/head') %>
+<%- include('../partials/adminNav') %>
+
+<main class="page">
+  <div class="container">
+    <div class="page__header">
+      <div>
+        <h1 class="page__title">กลุ่มและผู้ติดตาม LINE</h1>
+        <p class="page__subtitle">
+          กลุ่มที่ใช้งานอยู่ <%= counts.groups %> · ผู้ติดตาม <%= counts.users %>
+        </p>
+      </div>
+      <% if (can('alert.broadcast')) { %>
+        <form method="post" action="/admin/line/test" class="page__actions">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <select class="select input--sm" name="target" style="width:auto">
+            <option value="">ปลายทางเริ่มต้น</option>
+            <% groups.filter((g) => g.isActive).forEach((group) => { %>
+              <option value="<%= group.groupId %>"><%= group.label %></option>
+            <% }) %>
+          </select>
+          <button class="btn btn--primary" type="submit">ส่งข้อความทดสอบ</button>
+        </form>
+      <% } %>
+    </div>
+
+    <% if (sent === '1') { %><div class="alert alert--success">ส่งข้อความทดสอบเรียบร้อยแล้ว</div><% } %>
+    <% if (sent === '0') { %><div class="alert alert--danger">ส่งข้อความทดสอบไม่สำเร็จ — ตรวจสอบ token และการเชื่อมต่อ</div><% } %>
+
+    <div class="alert alert--info">
+      <strong>วิธีเพิ่มกลุ่ม:</strong> เชิญบัญชี LINE ของระบบเข้ากลุ่ม
+      แล้วพิมพ์ <span class="mono">กลุ่ม</span> ในกลุ่มนั้นเพื่อดูรหัส
+      ระบบจะบันทึกกลุ่มให้อัตโนมัติเมื่อได้รับเหตุการณ์ <span class="mono">join</span>
+    </div>
+
+    <section class="card mb-3">
+      <div class="card__header"><h2 class="card__title">กลุ่ม</h2></div>
+      <div class="table-wrap" style="border:none">
+        <table class="table">
+          <thead>
+            <tr><th>ชื่อที่ตั้ง</th><th>รหัสกลุ่ม</th><th>ชนิด</th>
+                <th>สถานะ</th><th>กิจกรรมล่าสุด</th><% if (canManage) { %><th></th><% } %></tr>
+          </thead>
+          <tbody>
+            <% if (!groups.length) { %>
+              <tr><td colspan="6" class="table__empty">ยังไม่มีกลุ่ม LINE</td></tr>
+            <% } %>
+            <% groups.forEach((group) => { %>
+              <tr>
+                <td><%= group.displayName || '—' %></td>
+                <td class="mono small" style="max-width:14rem;overflow:hidden;text-overflow:ellipsis">
+                  <%= group.groupId %>
+                </td>
+                <td><span class="badge"><%= group.type %></span></td>
+                <td>
+                  <span class="badge badge--<%= group.isActive ? 'success' : '' %>">
+                    <%= group.isActive ? 'อยู่ในกลุ่ม' : 'ออกแล้ว' %>
+                  </span>
+                </td>
+                <td class="small"><%= formatDateTime(group.lastActiveAt) %></td>
+                <% if (canManage) { %>
+                  <td class="table__actions">
+                    <form method="post" action="/admin/line/<%= group.id %>/rename" class="flex">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <input class="input input--sm" type="text" name="displayName"
+                             value="<%= group.displayName || '' %>" placeholder="ตั้งชื่อให้จำง่าย"
+                             maxlength="255" style="width:12rem">
+                      <button class="btn btn--sm" type="submit">บันทึก</button>
+                    </form>
+                  </td>
+                <% } %>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card__header"><h2 class="card__title">ผู้ติดตาม</h2></div>
+      <div class="table-wrap" style="border:none;max-height:24rem;overflow-y:auto">
+        <table class="table">
+          <thead>
+            <tr><th>รหัสผู้ใช้</th><th>สถานะ</th><th>เริ่มติดตาม</th><th>กิจกรรมล่าสุด</th></tr>
+          </thead>
+          <tbody>
+            <% if (!users.length) { %>
+              <tr><td colspan="4" class="table__empty">ยังไม่มีผู้ติดตาม</td></tr>
+            <% } %>
+            <% users.forEach((user) => { %>
+              <tr>
+                <td class="mono small" style="max-width:14rem;overflow:hidden;text-overflow:ellipsis">
+                  <%= user.lineUserId %>
+                </td>
+                <td>
+                  <span class="badge badge--<%= user.isActive ? 'success' : '' %>">
+                    <%= user.isActive ? 'ติดตามอยู่' : 'เลิกติดตาม' %>
+                  </span>
+                </td>
+                <td class="small"><%= formatDateTime(user.followedAt) %></td>
+                <td class="small"><%= formatDateTime(user.lastActiveAt) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</main>
+
+<%- include('../partials/foot') %>

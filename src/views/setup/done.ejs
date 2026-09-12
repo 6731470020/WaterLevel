@@ -1,0 +1,48 @@
+<%- include('../partials/head', { bodyClass: 'setup-page', pageStyles: ['/css/setup.css'] }) %>
+
+<header class="setup-hero">
+  <div class="setup-hero__logo" aria-hidden="true">✅</div>
+  <h1>ติดตั้งเสร็จสมบูรณ์</h1>
+  <p>ระบบพร้อมใช้งานแล้ว</p>
+</header>
+
+<main class="setup setup--narrow">
+
+  <ol class="setup__steps-done">
+    <% steps.forEach((step) => { %>
+      <li class="setup__step-done">
+        <span class="setup__check" aria-hidden="true">✓</span>
+        <div>
+          <strong><%= step.label %></strong>
+          <br><span class="small muted"><%= step.detail %></span>
+        </div>
+      </li>
+    <% }) %>
+  </ol>
+
+  <div class="alert alert--warning mt-3">
+    <strong>ขั้นตอนถัดไปที่ควรทำ</strong>
+    <ul>
+      <li>หน้าตั้งค่านี้<strong>ถูกปิดถาวรแล้ว</strong> เพราะระบบมีผู้ใช้แล้ว</li>
+      <li>ตั้งค่า <span class="mono">DETECTION_DRIVER=http</span> และ
+          <span class="mono">WATER_API_URL</span> ในไฟล์ <span class="mono">.env</span>
+          เมื่อพร้อมเชื่อมต่อบริการตรวจจับจริง</li>
+      <li>ตั้งค่า <span class="mono">NOTIFICATION_DRIVER=line</span> พร้อม Channel Access Token
+          เมื่อพร้อมส่งการแจ้งเตือนเข้า LINE</li>
+      <li>สร้างจุดวัด วาด ROI และใส่จุดเทียบค่าอย่างน้อย 2 จุด</li>
+    </ul>
+  </div>
+
+  <div class="setup__actions">
+    <a class="btn btn--primary btn--block" href="/login">
+      เข้าสู่ระบบด้วยบัญชี <%= username %>
+    </a>
+  </div>
+
+  <p class="field__hint text-center mt-2">
+    หากหน้าเข้าสู่ระบบยังไม่ตอบสนอง ให้รอสักครู่แล้วโหลดใหม่ —
+    ระบบกำลังเริ่มการทำงานใหม่ด้วยค่าตั้งค่าที่เพิ่งบันทึก
+  </p>
+</main>
+
+<%- include('../partials/foot') %>

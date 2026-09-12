@@ -1,0 +1,125 @@
+<%- include('../partials/head') %>
+<%- include('../partials/adminNav') %>
+
+<main class="page">
+  <div class="container">
+    <div class="page__header">
+      <div>
+        <h1 class="page__title">ประวัติการแจ้งเตือน</h1>
+        <p class="page__subtitle">ทั้งหมด <%= pagination.total.toLocaleString('th-TH') %> รายการ</p>
+      </div>
+      <% if (can('alert.broadcast')) { %>
+        <div class="page__actions">
+          <select class="select input--sm" id="broadcastStation" style="width:auto">
+            <% stations.forEach((station) => { %>
+              <option value="<%= station.id %>"><%= station.name %></option>
+            <% }) %>
+          </select>
+          <button class="btn btn--primary" type="button" id="broadcastNow">
+            📢 ส่งแจ้งเตือนด้วยตนเอง
+          </button>
+        </div>
+      <% } %>
+    </div>
+
+    <form class="filters" method="get" action="/admin/alerts">
+      <div class="field">
+        <label class="field__label" for="stationId">จุดวัด</label>
+        <select class="select input--sm" id="stationId" name="stationId" data-auto-submit>
+          <option value="">ทุกจุดวัด</option>
+          <% stations.forEach((station) => { %>
+            <option value="<%= station.id %>"
+                    <%= String(query.stationId) === String(station.id) ? 'selected' : '' %>>
+              <%= station.name %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field__label" for="status">สถานะ</label>
+        <select class="select input--sm" id="status" name="status" data-auto-submit>
+          <option value="">ทั้งหมด</option>
+          <option value="SENT" <%= query.status === 'SENT' ? 'selected' : '' %>>ส่งสำเร็จ</option>
+          <option value="FAILED" <%= query.status === 'FAILED' ? 'selected' : '' %>>ล้มเหลว</option>
+          <option value="PENDING" <%= query.status === 'PENDING' ? 'selected' : '' %>>รอส่ง</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field__label" for="messageType">ชนิดข้อความ</label>
+        <select class="select input--sm" id="messageType" name="messageType" data-auto-submit>
+          <option value="">ทั้งหมด</option>
+          <% ['ALERT', 'REPORT', 'TEST', 'REPLY'].forEach((type) => { %>
+            <option value="<%= type %>" <%= query.messageType === type ? 'selected' : '' %>><%= type %></option>
+          <% }) %>
+        </select>
+      </div>
+      <a class="btn btn--sm" href="/admin/alerts">ล้างตัวกรอง</a>
+    </form>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>เวลา</th><th>ชนิด</th><th>โซน</th><th>ช่องทาง</th>
+            <th>ปลายทาง</th><th>สถานะ</th><th>ผู้สั่ง</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (!alerts.length) { %>
+            <tr><td colspan="7" class="table__empty">ไม่พบการแจ้งเตือน</td></tr>
+          <% } %>
+          <% alerts.forEach((item) => { %>
+            <tr>
+              <td class="nowrap small"><%= formatDateTime(item.sentAt || item.createdAt) %></td>
+              <td><span class="badge"><%= item.messageType %></span></td>
+              <td>
+                <% const zone = zoneLevels.find((z) => z.key === item.zoneKey) ?? null; %>
+                <%- include('../partials/zoneBadge', { zone }) %>
+              </td>
+              <td class="small"><%= item.channel || '—' %></td>
+              <td class="mono small" style="max-width:12rem;overflow:hidden;text-overflow:ellipsis">
+                <%= item.target || 'broadcast' %>
+              </td>
+              <td>
+                <span class="badge badge--<%= item.status === 'SENT' ? 'success' : item.status === 'FAILED' ? 'danger' : '' %>">
+                  <%= item.status === 'SENT' ? 'ส่งแล้ว' : item.status === 'FAILED' ? 'ล้มเหลว' : 'รอส่ง' %>
+                </span>
+                <% if (item.errorMessage) { %>
+                  <br><span class="small muted" title="<%= item.errorMessage %>">
+                    <%= item.errorMessage.slice(0, 40) %>…
+                  </span>
+                <% } %>
+              </td>
+              <td class="small"><%= item.triggeredBy ? 'ผู้ใช้ #' + item.triggeredBy : 'ระบบ' %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+
+    <%- include('../partials/pagination') %>
+  </div>
+</main>
+
+<script>
+document.getElementById('broadcastNow')?.addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  const stationId = document.getElementById('broadcastStation').value;
+  if (!stationId) return;
+  if (!window.confirm('ส่งการแจ้งเตือนของจุดวัดนี้เข้ากลุ่ม LINE ทันที?')) return;
+
+  button.disabled = true;
+  try {
+    const result = await window.AppShell.api(`/api/admin/stations/${stationId}/alert`,
+      { method: 'POST' });
+    window.AppShell.toast(result.reason, result.sent ? 'success' : 'warning');
+    if (result.sent) setTimeout(() => window.location.reload(), 1200);
+  } catch (error) {
+    window.AppShell.toast(error.message, 'danger');
+  } finally {
+    button.disabled = false;
+  }
+});
+</script>
+
+<%- include('../partials/foot') %>

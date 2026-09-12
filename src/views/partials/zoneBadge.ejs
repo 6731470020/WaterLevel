@@ -1,0 +1,13 @@
+<%
+/**
+ * ป้ายแสดงโซนเตือนภัย พร้อมสีประจำโซน
+ * ตัวแปร: zone (อ็อบเจกต์จาก ZoneLevel.toJSON()) หรือ null
+ */
+%>
+<% if (zone) { %>
+  <span class="zone-badge" style="--zone-color: <%= zone.color %>">
+    <span class="zone-badge__dot" aria-hidden="true"></span><%= zone.label %>
+  </span>
+<% } else { %>
+  <span class="zone-badge zone-badge--unknown">ไม่ทราบสถานะ</span>
+<% } %>

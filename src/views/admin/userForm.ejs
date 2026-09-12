@@ -1,0 +1,181 @@
+<%- include('../partials/head') %>
+<%- include('../partials/adminNav') %>
+
+<main class="page">
+  <div class="container">
+    <div class="page__header">
+      <div>
+        <h1 class="page__title"><%= user ? `แก้ไขผู้ใช้ — ${user.username}` : 'สร้างผู้ใช้ใหม่' %></h1>
+      </div>
+    </div>
+
+    <% if (query.updated === '1') { %>
+      <div class="alert alert--success">
+        บันทึกการเปลี่ยนแปลงแล้ว
+        <span class="small">(หากแก้บทบาทหรือขอบเขต ระบบได้ล้าง session ของผู้ใช้คนนี้ทันที)</span>
+      </div>
+    <% } %>
+    <% if (query.passwordReset === '1') { %>
+      <div class="alert alert--success">
+        ตั้งรหัสผ่านใหม่แล้ว · ผู้ใช้ถูกออกจากระบบทุกอุปกรณ์และต้องเปลี่ยนรหัสผ่านเมื่อเข้าสู่ระบบครั้งถัดไป
+      </div>
+    <% } %>
+
+    <form method="post" action="<%= user ? `/admin/users/${user.id}` : '/admin/users' %>">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+      <div class="form-grid">
+        <%# ซ้าย = ข้อมูลของบัญชี · ขวา = สิ่งที่กำหนดว่าบัญชีนี้ทำอะไรได้บ้าง %>
+        <div class="form-grid__col">
+
+      <div class="card">
+        <div class="card__header"><h2 class="card__title">ข้อมูลบัญชี</h2></div>
+        <div class="card__body">
+          <% if (!user) { %>
+            <div class="field">
+              <label class="field__label" for="username">ชื่อผู้ใช้ *</label>
+              <input class="input mono" type="text" id="username" name="username"
+                     required minlength="3" maxlength="100" autocomplete="off">
+              <p class="field__hint">ตั้งแล้วเปลี่ยนไม่ได้</p>
+            </div>
+          <% } else { %>
+            <div class="field">
+              <span class="field__label">ชื่อผู้ใช้</span>
+              <p class="mono"><%= user.username %></p>
+            </div>
+          <% } %>
+
+          <div class="field">
+            <label class="field__label" for="email">อีเมล *</label>
+            <input class="input" type="email" id="email" name="email" required
+                   value="<%= user ? user.email : '' %>" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="field__label" for="fullName">ชื่อ-นามสกุล *</label>
+            <input class="input" type="text" id="fullName" name="fullName" required maxlength="200"
+                   value="<%= user ? user.fullName : '' %>">
+          </div>
+          <div class="field">
+            <label class="field__label" for="phone">เบอร์โทร</label>
+            <input class="input" type="tel" id="phone" name="phone" maxlength="50"
+                   value="<%= user ? (user.phone || '') : '' %>">
+          </div>
+          <div class="field">
+            <label class="field__label" for="status">สถานะ</label>
+            <select class="select" id="status" name="status">
+              <option value="ACTIVE" <%= !user || user.status === 'ACTIVE' ? 'selected' : '' %>>ใช้งานได้</option>
+              <option value="SUSPENDED" <%= user && user.status === 'SUSPENDED' ? 'selected' : '' %>>ระงับการใช้งาน</option>
+            </select>
+            <p class="field__hint">การระงับบัญชีจะล้าง session ของผู้ใช้ทันที</p>
+          </div>
+
+          <% if (!user) { %>
+            <div class="field">
+              <label class="field__label" for="password">รหัสผ่านเริ่มต้น *</label>
+              <input class="input" type="password" id="password" name="password"
+                     required minlength="10" autocomplete="new-password">
+              <p class="field__hint"><%= policy %></p>
+            </div>
+            <label class="checkbox">
+              <input type="checkbox" name="mustChangePassword" value="1" checked>
+              บังคับให้เปลี่ยนรหัสผ่านเมื่อเข้าสู่ระบบครั้งแรก
+            </label>
+          <% } %>
+        </div>
+      </div>
+
+        </div>
+
+        <div class="form-grid__col">
+
+      <div class="card">
+        <div class="card__header">
+          <h2 class="card__title">บทบาท</h2>
+          <span class="card__note">กำหนดว่าทำอะไรได้</span>
+        </div>
+        <div class="card__body">
+          <div class="flex flex--col">
+            <% roles.forEach((role) => { %>
+              <label class="checkbox">
+                <input type="checkbox" name="roleKeys" value="<%= role.key %>"
+                       <%= user && user.roles.some((r) => r.key === role.key) ? 'checked' : '' %>
+                       <%= role.key === 'SUPER_ADMIN' && !currentUser.isSuperAdmin ? 'disabled' : '' %>>
+                <span>
+                  <strong><%= role.name %></strong>
+                  <span class="small muted">— <%= role.description || `สิทธิ์ ${role.permissions.length} ข้อ` %></span>
+                </span>
+              </label>
+            <% }) %>
+          </div>
+          <p class="field__hint mt-1">
+            การแก้บทบาทจะล้าง session ของผู้ใช้คนนี้ทันที เพื่อให้สิทธิ์ใหม่มีผลทันที
+          </p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__header">
+          <h2 class="card__title">ขอบเขตจุดวัด</h2>
+          <span class="card__note">กำหนดว่าเห็นจุดไหน</span>
+        </div>
+        <div class="card__body">
+          <p class="field__hint mb-1">
+            ไม่เลือกเลย = เข้าถึงได้<strong>ทุกจุดวัด</strong>ตามบทบาท ·
+            เลือกบางจุด = จำกัดเฉพาะจุดที่เลือก (จุดวัดอื่นจะตอบ 404)
+          </p>
+          <div class="flex flex--col" style="max-height:16rem;overflow-y:auto">
+            <% stations.forEach((station) => { %>
+              <label class="checkbox">
+                <input type="checkbox" name="stationIds" value="<%= station.id %>"
+                       <%= user && user.stationIds && user.stationIds.includes(station.id) ? 'checked' : '' %>>
+                <%= station.name %>
+              </label>
+            <% }) %>
+            <% if (!stations.length) { %>
+              <p class="muted small">ยังไม่มีจุดวัดในระบบ</p>
+            <% } %>
+          </div>
+        </div>
+      </div>
+
+        </div>
+      </div>
+
+      <div class="flex mt-2">
+        <button class="btn btn--primary" type="submit">
+          <%= user ? 'บันทึกการเปลี่ยนแปลง' : 'สร้างผู้ใช้' %>
+        </button>
+        <a class="btn" href="/admin/users">ยกเลิก</a>
+      </div>
+    </form>
+
+    <% if (user && can('user.reset_password')) { %>
+      <details class="card card--details mt-3">
+        <summary class="card__header">
+          <h2 class="card__title">ตั้งรหัสผ่านใหม่</h2>
+          <span class="card__note">คลิกเพื่อเปิด</span>
+        </summary>
+        <div class="card__body">
+          <form method="post" action="/admin/users/<%= user.id %>/password">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <div class="field">
+              <label class="field__label" for="newPassword">รหัสผ่านใหม่</label>
+              <input class="input" type="password" id="newPassword" name="newPassword"
+                     required minlength="10" autocomplete="new-password">
+              <p class="field__hint">
+                <%= policy %><br>
+                ผู้ใช้จะถูกออกจากระบบทุกอุปกรณ์ และต้องเปลี่ยนรหัสผ่านเมื่อเข้าสู่ระบบครั้งถัดไป
+              </p>
+            </div>
+            <button class="btn btn--danger" type="submit"
+                    data-confirm="ตั้งรหัสผ่านใหม่ให้ <%= user.username %>?">
+              ตั้งรหัสผ่านใหม่
+            </button>
+          </form>
+        </div>
+      </details>
+    <% } %>
+  </div>
+</main>
+
+<%- include('../partials/foot') %>

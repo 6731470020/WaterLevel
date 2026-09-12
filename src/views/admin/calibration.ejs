@@ -1,0 +1,247 @@
+<%- include('../partials/head') %>
+<%- include('../partials/adminNav') %>
+
+<main class="page">
+  <div class="container">
+    <div class="page__header">
+      <div>
+        <h1 class="page__title">จุดเทียบค่าพิกเซล ↔ เมตร</h1>
+        <p class="page__subtitle"><%= station.name %></p>
+      </div>
+      <div class="page__actions">
+        <a class="btn" href="/admin/stations/<%= station.id %>">← กลับหน้าจุดวัด</a>
+      </div>
+    </div>
+
+    <div class="alert alert--info">
+      <strong>ทิศทางแกนสำคัญมาก:</strong>
+      แกน Y ของภาพนับจากบนลงล่าง ดังนั้น <strong>พิกเซลน้อย = น้ำสูง</strong> และ
+      <strong>พิกเซลมาก = น้ำต่ำ</strong>
+      เมื่อเรียงพิกเซลจากน้อยไปมาก ค่าเมตรจึงควรลดลงตามลำดับ
+    </div>
+
+    <% if (!ready) { %>
+      <div class="alert alert--warning">
+        ต้องมีจุดเทียบค่าอย่างน้อย 2 จุด ระบบจึงจะแปลงค่าเป็นเมตรได้
+        <br><span class="small">
+          ระบบ<strong>ไม่ใช้ค่าสำรองใด ๆ</strong> — หากจุดไม่ครบ ค่าวัดจะถูกบันทึกเป็นพิกเซลเท่านั้น
+          เพื่อไม่ให้รายงานผิดโดยไม่มีสัญญาณเตือนเหมือนระบบเดิม
+        </span>
+      </div>
+    <% } %>
+
+    <div class="grid grid--2">
+      <section class="card">
+        <div class="card__header">
+          <h2 class="card__title">จุดเทียบค่า</h2>
+          <button class="btn btn--sm" type="button" id="addRow">+ เพิ่มแถว</button>
+        </div>
+        <div class="card__body">
+          <div class="table-wrap" style="border:none">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th class="table__num">พิกเซล Y</th>
+                  <th class="table__num">ระดับน้ำ (เมตร)</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="pointRows"></tbody>
+            </table>
+          </div>
+          <div class="flex mt-2">
+            <button class="btn btn--primary" type="button" id="savePoints">บันทึกจุดเทียบค่า</button>
+            <button class="btn" type="button" id="reloadPoints">โหลดค่าเดิม</button>
+          </div>
+          <div id="calibrationWarnings" class="mt-2"></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card__header"><h2 class="card__title">ทดสอบการแปลงค่า</h2></div>
+        <div class="card__body">
+          <div class="flex flex--wrap flex--center mb-2">
+            <input class="input input--sm" type="number" id="testPixel"
+                   placeholder="ค่าพิกเซล Y" min="0" style="width:9rem">
+            <button class="btn btn--sm btn--primary" type="button" id="runTest">แปลงค่า</button>
+            <strong id="testOutput" class="mono"></strong>
+          </div>
+
+          <h3 style="font-size:.9rem">ตารางเทียบค่า (ทุก 20 พิกเซล)</h3>
+          <div class="table-wrap" style="max-height:340px;overflow-y:auto">
+            <table class="table">
+              <thead><tr><th class="table__num">พิกเซล</th><th class="table__num">เมตร</th></tr></thead>
+              <tbody>
+                <% preview.forEach((row) => { %>
+                  <tr>
+                    <td class="table__num mono"><%= row.pixel %></td>
+                    <td class="table__num mono"><%= formatNumber(row.meter) %></td>
+                  </tr>
+                <% }) %>
+                <% if (!preview.length) { %>
+                  <tr><td colspan="2" class="table__empty">ยังคำนวณไม่ได้</td></tr>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<script type="application/json" id="calibrationData"><%- JSON.stringify({ stationId: station.id, points }) %></script>
+
+<script>
+/* ตัวจัดการตารางจุดเทียบค่า — เขียนเป็นคลาสให้เข้ากับแนวทางของโปรเจกต์ */
+class CalibrationTable {
+  #stationId; #tbody; #points;
+
+  #zonePoints;
+
+  constructor({ stationId, points, tbody }) {
+    this.#stationId = stationId;
+    // จุดที่มาจากโซนมีเจ้าของอยู่แล้ว แก้ที่เครื่องมือวาด ROI เท่านั้น
+    // แสดงไว้ให้เห็นภาพรวมแต่ไม่ส่งกลับตอนบันทึก มิฉะนั้นจะไปทับของโซนเอง
+    this.#zonePoints = points.filter((p) => p.zoneKey);
+    this.#points = points.filter((p) => !p.zoneKey).map((p) => ({ pixel: p.pixel, meter: p.meter }));
+    this.#tbody = tbody;
+  }
+
+  /** วาดตารางใหม่ทั้งหมด */
+  render() {
+    const zoneRows = this.#zonePoints.map((point) => `
+      <tr class="table__row--locked">
+        <td class="table__num mono">${point.pixel}</td>
+        <td class="table__num mono">${point.meter}</td>
+        <td class="table__actions">
+          <span class="badge badge--muted" title="แก้ค่านี้ที่เครื่องมือวาด ROI">
+            จากโซน ${CalibrationTable.escape(point.zoneLabel ?? point.zoneKey)}
+          </span>
+        </td>
+      </tr>
+    `).join('');
+
+    this.#tbody.innerHTML = zoneRows + this.#points.map((point, index) => `
+      <tr>
+        <td class="table__num">
+          <input class="input input--sm mono" type="number" data-field="pixel" data-index="${index}"
+                 value="${point.pixel}" min="0" style="text-align:right">
+        </td>
+        <td class="table__num">
+          <input class="input input--sm mono" type="number" step="0.01" data-field="meter"
+                 data-index="${index}" value="${point.meter}" style="text-align:right">
+        </td>
+        <td class="table__actions">
+          <button class="btn btn--sm btn--danger" type="button" data-remove="${index}">ลบ</button>
+        </td>
+      </tr>
+    `).join('') || (zoneRows ? '' : '<tr><td colspan="3" class="table__empty">ยังไม่มีจุดเทียบค่า</td></tr>');
+
+    this.#tbody.querySelectorAll('input').forEach((input) => {
+      input.addEventListener('change', () => {
+        this.#points[Number(input.dataset.index)][input.dataset.field] = Number(input.value);
+        this.validate();
+      });
+    });
+    this.#tbody.querySelectorAll('[data-remove]').forEach((button) => {
+      button.addEventListener('click', () => {
+        this.#points.splice(Number(button.dataset.remove), 1);
+        this.render();
+        this.validate();
+      });
+    });
+    this.validate();
+  }
+
+  /**
+   * หนีอักขระ HTML
+   * @param {string} value ข้อความ
+   * @returns {string}
+   */
+  static escape(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (character) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[character]));
+  }
+
+  /** เพิ่มแถวใหม่ */
+  addRow() {
+    this.#points.push({ pixel: 0, meter: 0 });
+    this.render();
+  }
+
+  /** ตรวจความสมเหตุสมผลแล้วแสดงคำเตือน */
+  validate() {
+    const warnings = [];
+    // ตรวจทิศทางจากชุดรวม เพราะตอนวัดจริงระบบใช้ทั้งจุดที่กรอกเองและจุดจากโซน
+    const sorted = [...this.#points, ...this.#zonePoints].sort((a, b) => a.pixel - b.pixel);
+
+    const total = this.#points.length + this.#zonePoints.length;
+    if (total < 2) warnings.push('ต้องมีจุดเทียบค่าอย่างน้อย 2 จุด');
+    const pixels = this.#points.map((p) => p.pixel);
+    if (new Set(pixels).size !== pixels.length) warnings.push('มีค่าพิกเซลซ้ำกัน');
+    const zonePixels = new Set(this.#zonePoints.map((p) => p.pixel));
+    for (const pixel of pixels) {
+      if (zonePixels.has(pixel)) {
+        warnings.push(`พิกเซล ${pixel} เป็นของโซนอยู่แล้ว — แก้ค่าที่เครื่องมือวาด ROI แทน`);
+      }
+    }
+
+    for (let i = 1; i < sorted.length; i += 1) {
+      if (sorted[i].meter > sorted[i - 1].meter) {
+        warnings.push(
+          `พิกเซล ${sorted[i - 1].pixel}→${sorted[i].pixel} ให้ค่าเมตรเพิ่มขึ้น ` +
+          `(${sorted[i - 1].meter}→${sorted[i].meter}) — ปกติพิกเซลมากกว่าควรหมายถึงน้ำต่ำกว่า`);
+      }
+    }
+
+    const box = document.getElementById('calibrationWarnings');
+    box.innerHTML = warnings.length
+      ? `<div class="alert alert--warning"><ul>${warnings.map((w) => `<li>${w}</li>`).join('')}</ul></div>`
+      : '<div class="alert alert--success">จุดเทียบค่าสมเหตุสมผล</div>';
+  }
+
+  /** บันทึกเข้าฐานข้อมูล */
+  async save() {
+    try {
+      const saved = await window.AppShell.api(
+        `/api/admin/stations/${this.#stationId}/calibration`,
+        { method: 'POST', body: { points: this.#points } });
+      this.#zonePoints = saved.filter((p) => p.zoneKey);
+      this.#points = saved.filter((p) => !p.zoneKey).map((p) => ({ pixel: p.pixel, meter: p.meter }));
+      this.render();
+      window.AppShell.toast(`บันทึกจุดเทียบค่า ${saved.length} จุดแล้ว`, 'success');
+      setTimeout(() => window.location.reload(), 1200);
+    } catch (error) {
+      window.AppShell.toast(error.message, 'danger');
+    }
+  }
+}
+
+const data = JSON.parse(document.getElementById('calibrationData').textContent);
+const table = new CalibrationTable({
+  stationId: data.stationId, points: data.points,
+  tbody: document.getElementById('pointRows'),
+});
+table.render();
+
+document.getElementById('addRow').addEventListener('click', () => table.addRow());
+document.getElementById('savePoints').addEventListener('click', () => table.save());
+document.getElementById('reloadPoints').addEventListener('click', () => window.location.reload());
+
+document.getElementById('runTest').addEventListener('click', async () => {
+  const pixel = document.getElementById('testPixel').value;
+  const output = document.getElementById('testOutput');
+  if (!pixel) return;
+  try {
+    const result = await window.AppShell.api(
+      `/api/admin/stations/${data.stationId}/calibration/test?pixel=${encodeURIComponent(pixel)}`);
+    output.textContent = `${result.pixel} px = ${result.meter.toFixed(2)} เมตร`;
+  } catch (error) {
+    output.textContent = error.message;
+  }
+});
+</script>
+
+<%- include('../partials/foot') %>

@@ -1,0 +1,12 @@
+<%
+/**
+ * ส่วนท้ายของทุกหน้า — ปิด <body> และโหลดสคริปต์
+ * `pageScripts` เป็นอาร์เรย์ของ URL สคริปต์เฉพาะหน้า
+ */
+/* ทนต่อ locals ที่ขาดด้วยเหตุผลเดียวกับ head.ejs */
+const scripts = typeof pageScripts !== 'undefined' ? pageScripts : [];
+%>
+  <script src="/js/app.js" defer></script>
+  <% scripts.forEach((src) => { %><script src="<%= src %>" defer></script><% }) %>
+</body>
+</html>

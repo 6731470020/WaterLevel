@@ -1,0 +1,91 @@
+<%- include('../partials/head') %>
+<%- include('../partials/adminNav') %>
+
+<main class="page">
+  <div class="container">
+    <div class="page__header">
+      <div>
+        <h1 class="page__title">บันทึกการใช้งานระบบ</h1>
+        <p class="page__subtitle">
+          ทั้งหมด <%= pagination.total.toLocaleString('th-TH') %> รายการ ·
+          ผู้ดูแลสูงสุดก็ถูกบันทึกทุกการกระทำ
+        </p>
+      </div>
+    </div>
+
+    <form class="filters" method="get" action="/admin/audit">
+      <div class="field">
+        <label class="field__label" for="action">การกระทำ</label>
+        <select class="select input--sm" id="action" name="action" data-auto-submit>
+          <option value="">ทั้งหมด</option>
+          <% actions.forEach((item) => { %>
+            <option value="<%= item %>" <%= query.action === item ? 'selected' : '' %>><%= item %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field__label" for="resourceType">ชนิดทรัพยากร</label>
+        <input class="input input--sm" type="text" id="resourceType" name="resourceType"
+               value="<%= query.resourceType || '' %>" placeholder="station, user, role…">
+      </div>
+      <div class="field">
+        <label class="field__label" for="from">ตั้งแต่วันที่</label>
+        <input class="input input--sm" type="date" id="from" name="from" value="<%= query.from || '' %>">
+      </div>
+      <div class="field">
+        <label class="field__label" for="to">ถึงวันที่</label>
+        <input class="input input--sm" type="date" id="to" name="to" value="<%= query.to || '' %>">
+      </div>
+      <button class="btn btn--sm btn--primary" type="submit">กรอง</button>
+      <a class="btn btn--sm" href="/admin/audit">ล้าง</a>
+    </form>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>เวลา</th><th>ผู้กระทำ</th><th>การกระทำ</th>
+            <th>ทรัพยากร</th><th>IP</th><th>รายละเอียด</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (!logs.length) { %>
+            <tr><td colspan="6" class="table__empty">ไม่พบบันทึกที่ตรงกับเงื่อนไข</td></tr>
+          <% } %>
+          <% logs.forEach((log) => { %>
+            <tr>
+              <td class="nowrap small"><%= formatDateTime(log.createdAt) %></td>
+              <td>
+                <%= log.actorLabel %>
+                <% if (log.actorId === null) { %>
+                  <br><span class="badge">ระบบ</span>
+                <% } %>
+              </td>
+              <td><span class="mono small"><%= log.action %></span></td>
+              <td class="small">
+                <%= log.resourceType %><% if (log.resourceId) { %> #<%= log.resourceId %><% } %>
+              </td>
+              <td class="mono small"><%= log.ip || '—' %></td>
+              <td>
+                <% if (log.beforeData || log.afterData) { %>
+                  <details>
+                    <summary class="small" style="cursor:pointer">ดูข้อมูล</summary>
+                    <pre class="mono" style="font-size:.7rem;max-width:28rem;overflow:auto;
+                                              background:var(--surface-2);padding:.5rem;
+                                              border-radius:4px;margin:.4rem 0 0"><%=
+                      JSON.stringify({ before: log.beforeData, after: log.afterData }, null, 2)
+                    %></pre>
+                  </details>
+                <% } else { %><span class="faint">—</span><% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+
+    <%- include('../partials/pagination') %>
+  </div>
+</main>
+
+<%- include('../partials/foot') %>

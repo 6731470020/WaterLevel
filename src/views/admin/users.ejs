@@ -1,0 +1,123 @@
+<%- include('../partials/head') %>
+<%- include('../partials/adminNav') %>
+
+<main class="page">
+  <div class="container">
+    <div class="page__header">
+      <div>
+        <h1 class="page__title">ผู้ใช้ระบบ</h1>
+        <p class="page__subtitle">ทั้งหมด <%= pagination.total %> บัญชี</p>
+      </div>
+      <% if (can('user.create')) { %>
+        <div class="page__actions">
+          <a class="btn btn--primary" href="/admin/users/new">+ สร้างผู้ใช้ใหม่</a>
+        </div>
+      <% } %>
+    </div>
+
+    <% if (query.created) { %>
+      <div class="alert alert--success">สร้างผู้ใช้ <%= query.created %> เรียบร้อยแล้ว</div>
+    <% } %>
+    <% if (query.deleted === '1') { %>
+      <div class="alert alert--success">ลบผู้ใช้เรียบร้อยแล้ว</div>
+    <% } %>
+
+    <form class="filters" method="get" action="/admin/users">
+      <div class="field">
+        <label class="field__label" for="search">ค้นหา</label>
+        <input class="input input--sm" type="search" id="search" name="search"
+               value="<%= query.search || '' %>" placeholder="ชื่อผู้ใช้ อีเมล หรือชื่อจริง">
+      </div>
+      <div class="field">
+        <label class="field__label" for="roleKey">บทบาท</label>
+        <select class="select input--sm" id="roleKey" name="roleKey" data-auto-submit>
+          <option value="">ทุกบทบาท</option>
+          <% roles.forEach((role) => { %>
+            <option value="<%= role.key %>" <%= query.roleKey === role.key ? 'selected' : '' %>>
+              <%= role.name %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field__label" for="status">สถานะ</label>
+        <select class="select input--sm" id="status" name="status" data-auto-submit>
+          <option value="">ทั้งหมด</option>
+          <option value="ACTIVE" <%= query.status === 'ACTIVE' ? 'selected' : '' %>>ใช้งานได้</option>
+          <option value="SUSPENDED" <%= query.status === 'SUSPENDED' ? 'selected' : '' %>>ระงับ</option>
+        </select>
+      </div>
+      <button class="btn btn--sm btn--primary" type="submit">ค้นหา</button>
+      <a class="btn btn--sm" href="/admin/users">ล้าง</a>
+    </form>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>ผู้ใช้</th><th>บทบาท</th><th>ขอบเขตจุดวัด</th>
+            <th>สถานะ</th><th>เข้าสู่ระบบล่าสุด</th><th class="table__actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (!users.length) { %>
+            <tr><td colspan="6" class="table__empty">ไม่พบผู้ใช้ที่ตรงกับเงื่อนไข</td></tr>
+          <% } %>
+          <% users.forEach((user) => { %>
+            <tr>
+              <td>
+                <strong><%= user.fullName %></strong>
+                <% if (user.isSuperAdmin) { %>
+                  <span class="badge badge--primary">ผู้ดูแลสูงสุด</span>
+                <% } %>
+                <br><span class="small muted mono"><%= user.username %> · <%= user.email %></span>
+              </td>
+              <td>
+                <% user.roles.forEach((role) => { %>
+                  <span class="badge"><%= role.name %></span>
+                <% }) %>
+                <% if (!user.roles.length) { %><span class="faint small">ไม่มีบทบาท</span><% } %>
+              </td>
+              <td class="small">
+                <%= user.stationIds === null
+                    ? 'ทุกจุดวัด'
+                    : `จำกัด ${user.stationIds.length} จุด` %>
+              </td>
+              <td>
+                <% if (user.isLocked) { %>
+                  <span class="badge badge--danger">ถูกล็อก</span>
+                <% } else if (user.status === 'ACTIVE') { %>
+                  <span class="badge badge--success">ใช้งานได้</span>
+                <% } else { %>
+                  <span class="badge badge--warning">ระงับ</span>
+                <% } %>
+                <% if (user.mustChangePassword) { %>
+                  <br><span class="small faint">ต้องเปลี่ยนรหัสผ่าน</span>
+                <% } %>
+              </td>
+              <td class="small"><%= user.lastLoginAt ? formatDateTime(user.lastLoginAt) : '—' %></td>
+              <td class="table__actions">
+                <div class="flex" style="justify-content:flex-end">
+                  <% if (can('user.update')) { %>
+                    <a class="btn btn--sm" href="/admin/users/<%= user.id %>/edit">แก้ไข</a>
+                  <% } %>
+                  <% if (can('user.delete') && user.id !== currentUser.id) { %>
+                    <form method="post" action="/admin/users/<%= user.id %>/delete" style="display:inline">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <button class="btn btn--sm btn--danger" type="submit"
+                              data-confirm="ลบผู้ใช้ <%= user.username %>?">ลบ</button>
+                    </form>
+                  <% } %>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+
+    <%- include('../partials/pagination') %>
+  </div>
+</main>
+
+<%- include('../partials/foot') %>

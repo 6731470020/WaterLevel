@@ -1,0 +1,38 @@
+{
+  "name": "water-level-monitoring",
+  "version": "1.0.0",
+  "description": "ระบบวัดระดับน้ำอัตโนมัติจากภาพกล้องวงจรปิด (Node.js OOP)",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "db:setup": "node scripts/setup-database.js",
+    "db:migrate": "node scripts/setup-database.js --migrate-only",
+    "db:seed": "node scripts/setup-database.js --seed-only",
+    "create:admin": "node scripts/create-admin.js",
+    "migrate:legacy": "node scripts/migrate-legacy.js",
+    "test": "node --test \"test/unit/*.test.js\" \"test/integration/*.test.js\"",
+    "test:unit": "node --test \"test/unit/*.test.js\"",
+    "test:integration": "node --test \"test/integration/*.test.js\""
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.4.1",
+    "express-session": "^1.18.1",
+    "helmet": "^7.1.0",
+    "multer": "^2.2.0",
+    "mysql2": "^3.11.5",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.9.16",
+    "sharp": "^0.33.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
+  }
+}

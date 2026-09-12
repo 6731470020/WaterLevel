@@ -1,0 +1,222 @@
+/* ═══════════════════════════════════════════════════════════════
+   เอกสารรายงานระดับน้ำ — ออกแบบสำหรับกระดาษ A4 โดยเฉพาะ
+
+   ใช้การพิมพ์ของเบราว์เซอร์แทนการสร้าง PDF ฝั่งเซิร์ฟเวอร์ จึงได้การตัดคำ
+   ภาษาไทยและการจัดหน้าที่ถูกต้องโดยไม่ต้องฝังฟอนต์เอง
+   ทุกหน่วยเป็นมิลลิเมตร/พอยต์เพื่อให้ผลบนกระดาษตรงกับที่เห็นบนจอ
+   ═══════════════════════════════════════════════════════════════ */
+
+@page {
+  size: A4 portrait;
+  /* เว้นที่ด้านล่างให้แถบท้ายกระดาษที่ตรึงไว้ */
+  margin: 14mm 13mm 18mm;
+}
+
+:root {
+  --ink: #0f172a;
+  --ink-soft: #475569;
+  --ink-faint: #94a3b8;
+  --line: #e2e8f0;
+  --line-strong: #cbd5e1;
+  --brand: #0e7490;
+  --brand-soft: #ecfeff;
+  --high: #0891b2;
+  --low: #64748b;
+  --paper: #ffffff;
+
+  --zone-critical: #ef4444;
+  --zone-severe: #f97316;
+  --zone-danger: #eab308;
+  --zone-watch: #22c55e;
+  --zone-high: #06b6d4;
+  --zone-normal: #e5e7eb;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: #f1f5f9;
+  color: var(--ink);
+  font-family: "Sarabun", "TH Sarabun New", "Noto Sans Thai", "Segoe UI", system-ui, sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.5;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ── มุมมองบนจอ: จำลองแผ่นกระดาษให้เห็นก่อนพิมพ์จริง ── */
+.sheet {
+  width: 210mm;
+  min-height: 297mm;
+  margin: 8mm auto;
+  padding: 14mm 13mm 18mm;
+  background: var(--paper);
+  box-shadow: 0 2px 14px rgba(15, 23, 42, .14);
+}
+
+/* ── แถบเครื่องมือ (ไม่พิมพ์ออกมา) ── */
+.toolbar {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+  padding: .7rem 1rem;
+  background: var(--ink); color: #fff;
+  font-size: 10pt;
+}
+.toolbar__spacer { flex: 1; }
+.toolbar__hint { color: #cbd5e1; font-size: 9pt; }
+.toolbar a, .toolbar button {
+  font: inherit; cursor: pointer; text-decoration: none;
+  padding: .35rem .85rem; border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, .35);
+  background: transparent; color: #fff;
+}
+.toolbar button.is-primary { background: #fff; color: var(--ink); border-color: #fff; font-weight: 600; }
+
+/* ── หัวเอกสาร ── */
+.doc-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 10mm; padding-bottom: 4mm; margin-bottom: 6mm;
+  border-bottom: 2.5pt solid var(--brand);
+}
+.doc-head__eyebrow {
+  font-size: 8.5pt; font-weight: 600; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--brand);
+}
+.doc-head__title { margin: .5mm 0 0; font-size: 20pt; font-weight: 700; line-height: 1.15; }
+.doc-head__range { margin: 1.5mm 0 0; font-size: 11pt; color: var(--ink-soft); }
+.doc-head__meta { text-align: right; font-size: 8.5pt; color: var(--ink-faint); line-height: 1.7; white-space: nowrap; }
+.doc-head__mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 13mm; height: 13mm; margin-bottom: 2mm; border-radius: 3mm;
+  background: var(--brand-soft); color: var(--brand); font-size: 16pt;
+}
+
+/* ── สารบัญจุดวัดบนหน้าแรก ── */
+.overview { margin-bottom: 7mm; }
+.overview__title {
+  margin: 0 0 2.5mm; font-size: 9pt; font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint);
+}
+
+/* ── ส่วนของแต่ละจุดวัด ── */
+.station { break-inside: auto; }
+/* จุดวัดถัดไปขึ้นหน้าใหม่เสมอ — "แยกจุดวัด" ต้องแยกจริงบนกระดาษ ไม่ใช่แค่มีหัวข้อคั่น */
+.station + .station { break-before: page; }
+/* มีหน้าปก = จุดวัดแรกต้องขึ้นหน้าใหม่ด้วย ไม่งั้นตารางของจุดวัดแรกจะโผล่มา
+   แค่ 1–2 แถวท้ายหน้าปกแล้วตัดหน้า ซึ่งอ่านแล้วสะดุด
+   ⚠️ ต้องระบุทั้งสองตัวที่อาจอยู่ติดกับ .station ได้ — ตัวเลือกแบบ `+` ดูพี่น้อง
+   ที่ติดกันจริง ๆ เท่านั้น แทรกอะไรคั่นเมื่อไรกฎก็หลุดทันที */
+.overview + .station,
+.reading-note + .station { break-before: page; }
+
+.station__head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 6mm;
+  padding: 4mm 4mm; margin-bottom: 4.5mm;
+  background: var(--brand-soft);
+  border-left: 3pt solid var(--brand);
+  border-radius: 0 2mm 2mm 0;
+  break-after: avoid;
+}
+.station__name { margin: 0; font-size: 13.5pt; font-weight: 700; }
+.station__meta { margin: 1mm 0 0; font-size: 8.5pt; color: var(--ink-soft); }
+.station__index {
+  flex: none; font-size: 8.5pt; font-weight: 700; color: var(--brand);
+  padding: .8mm 2.5mm; border: 1pt solid var(--brand); border-radius: 999px;
+}
+
+/* ── แถวตัวเลขสรุป ── */
+.stats {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 3mm;
+  margin-bottom: 5mm; break-inside: avoid;
+}
+.stat {
+  padding: 3mm 3.5mm; border: .75pt solid var(--line); border-radius: 2mm;
+  border-top: 2.5pt solid var(--line-strong);
+}
+.stat--peak { border-top-color: var(--high); }
+.stat--trough { border-top-color: var(--low); }
+.stat--range { border-top-color: var(--zone-danger); }
+.stat--days { border-top-color: var(--brand); }
+.stat__label { font-size: 8pt; color: var(--ink-soft); }
+.stat__value {
+  margin-top: .8mm; font-size: 15pt; font-weight: 700; line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.stat__unit { font-size: 9pt; font-weight: 500; color: var(--ink-soft); }
+.stat__note { margin-top: .8mm; font-size: 7.5pt; color: var(--ink-faint); }
+
+/* ── กราฟช่วงระดับน้ำรายวัน (inline SVG) ── */
+.chart { margin-bottom: 5mm; break-inside: avoid; }
+.chart__frame { width: 100%; height: auto; }
+.chart__caption {
+  display: flex; gap: 5mm; justify-content: center;
+  margin-top: 1.5mm; font-size: 8pt; color: var(--ink-soft);
+}
+.chart__key { display: inline-flex; align-items: center; gap: 1.2mm; }
+.chart__swatch { width: 3mm; height: 3mm; border-radius: 50%; }
+
+/* ── ตารางรายวัน ── */
+.table { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+/* หัวตารางซ้ำทุกหน้าเมื่อตารางยาวข้ามหน้า — ผู้อ่านต้องรู้เสมอว่าคอลัมน์ไหนคืออะไร
+   แต่แถวสรุป **ห้ามซ้ำ** เพราะ `table-footer-group` จะเอาไปแปะท้ายทุกหน้า
+   ทำให้ดูเหมือนยอดรวมของหน้านั้น ๆ ทั้งที่เป็นยอดรวมของทั้งช่วง */
+.table thead { display: table-header-group; }
+.table tfoot { display: table-row-group; }
+.table tr { break-inside: avoid; }
+.table th, .table td {
+  padding: 1.6mm 2.2mm; text-align: left;
+  border-bottom: .5pt solid var(--line);
+}
+.table thead th {
+  font-size: 8pt; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--ink-soft); background: #f8fafc;
+  border-bottom: 1pt solid var(--line-strong);
+}
+.table tbody tr:nth-child(even) td { background: #fbfdfe; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.time { font-size: 8pt; color: var(--ink-faint); }
+.peak { color: var(--high); font-weight: 700; }
+.trough { color: var(--low); font-weight: 700; }
+.muted { color: var(--ink-faint); }
+
+.table tfoot td {
+  font-weight: 700; background: #f8fafc;
+  border-top: 1pt solid var(--line-strong); border-bottom: none;
+}
+
+/* ── แถบท้ายกระดาษ ── */
+.doc-foot {
+  margin-top: 6mm; padding-top: 2.5mm;
+  border-top: .5pt solid var(--line);
+  display: flex; justify-content: space-between;
+  font-size: 7.5pt; color: var(--ink-faint);
+}
+
+.empty {
+  padding: 20mm 0; text-align: center; color: var(--ink-faint);
+  border: 1pt dashed var(--line-strong); border-radius: 2mm;
+}
+
+.notice {
+  padding: 2.5mm 3mm; margin-bottom: 5mm;
+  border-left: 2.5pt solid var(--zone-danger); background: #fefce8;
+  font-size: 9pt;
+}
+
+/* ── ตอนพิมพ์จริง ── */
+@media print {
+  body { background: none; font-size: 10pt; }
+  .sheet { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
+  .toolbar { display: none !important; }
+  a { color: inherit; text-decoration: none; }
+}
+
+/* ── หมายเหตุวิธีอ่านบนหน้าปก ── */
+.reading-note { margin-top: 8mm; break-inside: avoid; }
+.note-list {
+  display: grid; grid-template-columns: 42mm 1fr;
+  gap: 1.8mm 5mm; margin: 0; font-size: 9pt;
+}
+.note-list dt { font-weight: 700; color: var(--ink-soft); }
+.note-list dd { margin: 0; color: var(--ink); }

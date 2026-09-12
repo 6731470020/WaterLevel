@@ -1,0 +1,51 @@
+<%- include('../partials/head') %>
+<%- include('../partials/adminNav') %>
+
+<main class="page">
+  <div class="container container--narrow">
+    <div class="page__header">
+      <div>
+        <h1 class="page__title">อุปกรณ์ที่เข้าสู่ระบบอยู่</h1>
+        <p class="page__subtitle">หากพบอุปกรณ์ที่ไม่รู้จัก ให้ออกจากระบบทุกอุปกรณ์แล้วเปลี่ยนรหัสผ่านทันที</p>
+      </div>
+      <form method="post" action="/logout-all" class="page__actions">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button class="btn btn--danger" type="submit">ออกจากระบบทุกอุปกรณ์</button>
+      </form>
+    </div>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>อุปกรณ์</th>
+            <th>หมายเลข IP</th>
+            <th>เข้าสู่ระบบเมื่อ</th>
+            <th>หมดอายุ</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (!sessions.length) { %>
+            <tr><td colspan="5" class="table__empty">ไม่พบ session ที่ใช้งานอยู่</td></tr>
+          <% } %>
+          <% sessions.forEach((item) => { %>
+            <tr>
+              <td><%= item.device %></td>
+              <td class="mono"><%= item.ip || '—' %></td>
+              <td><%= formatDateTime(item.createdAt) %></td>
+              <td><%= formatDateTime(item.expiresAt) %></td>
+              <td class="table__actions">
+                <% if (item.sidSuffix === currentSuffix) { %>
+                  <span class="badge badge--primary">อุปกรณ์นี้</span>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<%- include('../partials/foot') %>
